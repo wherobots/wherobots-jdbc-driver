@@ -1,15 +1,40 @@
 package com.wherobots.db.jdbc;
 
-import java.io.Closeable;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 
-public class WherobotsSession implements Closeable {
+import java.io.Closeable;
+import java.net.URI;
+import java.nio.ByteBuffer;
+
+public class WherobotsSession extends WebSocketClient implements Closeable {
+
+    public WherobotsSession(URI uri) {
+        super(uri);
+    }
 
     @Override
-    public void close() {
+    public void onOpen(ServerHandshake serverHandshake) {
 
     }
 
-    public boolean isClosed() {
-        return false;
+    @Override
+    public void onMessage(String s) {
+
+    }
+
+    @Override
+    public void onMessage(ByteBuffer bytes) {
+
+    }
+
+    @Override
+    public void onClose(int i, String s, boolean b) {
+
+    }
+
+    @Override
+    public void onError(Exception e) {
+
     }
 }
