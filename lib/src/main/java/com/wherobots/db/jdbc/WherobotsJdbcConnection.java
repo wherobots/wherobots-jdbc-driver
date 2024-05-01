@@ -20,6 +20,13 @@ import java.util.Properties;
 import java.util.concurrent.Executor;
 
 public class WherobotsJdbcConnection implements Connection {
+
+    private final WherobotsSession session;
+
+    public WherobotsJdbcConnection(WherobotsSession session) {
+        this.session = session;
+    }
+
     @Override
     public Statement createStatement() throws SQLException {
         return null;
@@ -37,37 +44,37 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public String nativeSQL(String sql) throws SQLException {
-        return "";
+        return sql;
     }
 
     @Override
     public void setAutoCommit(boolean autoCommit) throws SQLException {
-
+        throw new SQLException("Transactions are not supported");
     }
 
     @Override
-    public boolean getAutoCommit() throws SQLException {
+    public boolean getAutoCommit() {
         return false;
     }
 
     @Override
     public void commit() throws SQLException {
-
+        throw new SQLException("Transactions are not supported");
     }
 
     @Override
     public void rollback() throws SQLException {
-
+        throw new SQLException("Transactions are not supported");
     }
 
     @Override
     public void close() throws SQLException {
-
+        this.session.close();
     }
 
     @Override
     public boolean isClosed() throws SQLException {
-        return false;
+        return this.session.isClosed();
     }
 
     @Override
@@ -77,11 +84,11 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void setReadOnly(boolean readOnly) throws SQLException {
-
+        throw new SQLException("Read-only mode is not supported");
     }
 
     @Override
-    public boolean isReadOnly() throws SQLException {
+    public boolean isReadOnly() {
         return false;
     }
 
@@ -97,22 +104,22 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void setTransactionIsolation(int level) throws SQLException {
-
+        throw new SQLException("Transactions are not supported");
     }
 
     @Override
-    public int getTransactionIsolation() throws SQLException {
-        return 0;
+    public int getTransactionIsolation() {
+        return Connection.TRANSACTION_NONE;
     }
 
     @Override
-    public SQLWarning getWarnings() throws SQLException {
+    public SQLWarning getWarnings() {
         return null;
     }
 
     @Override
-    public void clearWarnings() throws SQLException {
-
+    public void clearWarnings() {
+        // No-op
     }
 
     @Override
@@ -157,17 +164,17 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public Savepoint setSavepoint(String name) throws SQLException {
-        return null;
+        throw new SQLException("Transactions are not supported");
     }
 
     @Override
     public void rollback(Savepoint savepoint) throws SQLException {
-
+        throw new SQLException("Transactions are not supported");
     }
 
     @Override
     public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-
+        throw new SQLException("Transactions are not supported");
     }
 
     @Override
@@ -222,6 +229,7 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public boolean isValid(int timeout) throws SQLException {
+        // TODO: send dummy query to validate the connection.
         return false;
     }
 
@@ -267,7 +275,7 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void abort(Executor executor) throws SQLException {
-
+        this.close();
     }
 
     @Override
