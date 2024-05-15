@@ -1,5 +1,7 @@
 package com.wherobots.db.jdbc;
 
+import com.wherobots.db.jdbc.internal.ExecutionResult;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -15,7 +17,7 @@ public class WherobotsStatement implements Statement {
 
     public static final int DEFAULT_QUERY_TIMEOUT_SECONDS = 300;
 
-    private final BlockingQueue<ResultSet> queue;
+    private final BlockingQueue<ExecutionResult> queue;
     private final WherobotsJdbcConnection connection;
 
     private int timeoutSeconds = DEFAULT_QUERY_TIMEOUT_SECONDS;
@@ -30,8 +32,8 @@ public class WherobotsStatement implements Statement {
         this.queue = new ArrayBlockingQueue<>(1);
     }
 
-    void onExecutionResult(ResultSet results) throws InterruptedException {
-        this.queue.put(results);
+    void onExecutionResult(ExecutionResult result) throws InterruptedException {
+        this.queue.put(result);
     }
 
     @Override
@@ -128,11 +130,19 @@ public class WherobotsStatement implements Statement {
         this.executionId = this.connection.execute(sql, this);
 
         try {
-            this.results = this.queue.poll(this.timeoutSeconds, TimeUnit.SECONDS);
-            if (this.results != null) {
-                // TODO: differentiate between queries and insert/update/delete results
-                return true;
+            ExecutionResult result = this.queue.poll(this.timeoutSeconds, TimeUnit.SECONDS);
+            if (result == null) {
+                throw new SQLTimeoutException(
+                        String.format("No results received after %d second(s)", this.timeoutSeconds));
             }
+
+            if (result.error() != null) {
+                throw new SQLException(result.error());
+            }
+
+            // TODO: differentiate between queries and insert/update/delete results
+            this.results = result.result();
+            return true;
         } catch (InterruptedException e) {
             // Pass through
         }

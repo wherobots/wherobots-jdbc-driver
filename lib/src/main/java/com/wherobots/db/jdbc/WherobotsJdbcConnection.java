@@ -1,6 +1,7 @@
 package com.wherobots.db.jdbc;
 
 import com.wherobots.db.DataCompression;
+import com.wherobots.db.jdbc.internal.ExecutionResult;
 import com.wherobots.db.jdbc.internal.Frame;
 import com.wherobots.db.jdbc.models.Event;
 import com.wherobots.db.jdbc.serde.ArrowUtil;
@@ -99,22 +100,27 @@ public class WherobotsJdbcConnection implements Connection {
 
             switch (event.state) {
                 case succeeded -> this.retrieveResults(event.executionId);
-                // TODO: handle FAILED
+                case failed -> {
+                    // No-op, error event will follow.
+                }
             }
 
             return;
         }
 
-        if (event instanceof Event.ExecutionResultEvent) {
-            Event.ExecutionResultEvent ere = (Event.ExecutionResultEvent) event;
+        if (event instanceof Event.ExecutionResultEvent ere) {
             Event.Results results = ere.results;
 
             logger.info(
                     "Received {} bytes of {}-compressed {} results from {}.",
                     results.resultBytes.length, results.compression, results.format, event.executionId);
             ArrowStreamReader reader = ArrowUtil.readFrom(results.resultBytes, results.compression);
-            query.statement().onExecutionResult(new WherobotsResultSet(reader));
+            query.statement().onExecutionResult(new ExecutionResult(new WherobotsResultSet(reader), null));
+            return;
+        }
 
+        if (event instanceof Event.ErrorEvent error) {
+            query.statement().onExecutionResult(new ExecutionResult(null, new SQLException(error.message)));
             return;
         }
 
