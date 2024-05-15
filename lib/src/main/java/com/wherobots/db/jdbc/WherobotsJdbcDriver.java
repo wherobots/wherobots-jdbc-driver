@@ -3,6 +3,7 @@ package com.wherobots.db.jdbc;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.net.URIBuilder;
 
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.sql.Connection;
 import java.sql.Driver;
@@ -11,11 +12,8 @@ import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 public class WherobotsJdbcDriver implements Driver {
-
-    private static final Logger logger = Logger.getLogger(WherobotsJdbcDriver.class.getName());
 
     private static final String JDBC_PREFIX = "jdbc:";
     private static final String URL_PREFIX = "jdbc:wherobots://";
@@ -24,12 +22,14 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String TOKEN_PROP = "token";
     public static final String RUNTIME_PROP = "runtime";
     public static final String REGION_PROP = "region";
+    public static final String WS_URI_PROP = "wsUri";
 
-    public static final String DEFAULT_ENDPOINT = "cloud.wherobots.com";
+    public static final String DEFAULT_ENDPOINT = "api.cloud.wherobots.com";
+    public static final String STAGING_ENDPOINT = "api.staging.wherobots.com";
+
     public static final Runtime DEFAULT_RUNTIME = Runtime.SEDONA;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
 
-    private static final Logger PARENT_LOGGER = Logger.getLogger(WherobotsJdbcDriver.class.getPackageName());
     private static final int MAJOR_VERSION = 1;
     private static final int MINOR_VERSION = 0;
 
@@ -59,16 +59,17 @@ public class WherobotsJdbcDriver implements Driver {
 
         Map<String, String> headers = getAuthHeaders(info);
 
-        logger.info(String.format(
-                "Requesting %s/%s runtime in %s from %s...",
-                runtime, runtime.name, region, host));
-
-        try {
-            WherobotsSession session = new WherobotsSessionSupplier(host, runtime, region, headers).get();
-            return new WherobotsJdbcConnection(session);
-        } catch (Exception e) {
-            throw new SQLException(e);
+        String wsUriString = info.getProperty(WS_URI_PROP);
+        if (StringUtils.isNotBlank(wsUriString)) {
+            try {
+                URI wsUri = new URI(wsUriString);
+                return new WherobotsJdbcConnection(WherobotsSessionSupplier.create(wsUri, headers));
+            } catch (URISyntaxException e) {
+                throw new SQLException("Invalid WebSocket URI: " + wsUriString, e);
+            }
         }
+
+        return new WherobotsJdbcConnection(WherobotsSessionSupplier.create(host, runtime, region, headers));
     }
 
     private Map<String, String> getAuthHeaders(Properties info) {
@@ -112,7 +113,7 @@ public class WherobotsJdbcDriver implements Driver {
     }
 
     @Override
-    public Logger getParentLogger() {
-        return PARENT_LOGGER;
+    public java.util.logging.Logger getParentLogger() {
+        return java.util.logging.Logger.getLogger(WherobotsJdbcDriver.class.getName());
     }
 }
