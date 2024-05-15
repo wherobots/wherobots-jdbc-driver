@@ -1,4 +1,4 @@
-package com.wherobots.db.jdbc;
+package com.wherobots.db;
 
 public enum Region {
     AWS_US_WEST_2("aws-us-west-2");

@@ -1,4 +1,4 @@
-package com.wherobots.db.jdbc;
+package com.wherobots.db.jdbc.session;
 
 import com.wherobots.db.jdbc.internal.Frame;
 import org.java_websocket.client.WebSocketClient;
@@ -16,6 +16,15 @@ import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
+/**
+ * A WebSocket connection to a running Wherobots SQL Session instance.
+ * <p>
+ * This class wraps a WebSocket connection to a Wherobots SQL Session server and presents itself as an iterable of
+ * {@link Frame} messages.
+ * </p>
+ *
+ * @author mpetazzoni
+ */
 public class WherobotsSession extends WebSocketClient implements Iterable<Frame>, Closeable {
 
     public static final Logger logger = LoggerFactory.getLogger(WherobotsSession.class);

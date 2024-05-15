@@ -1,4 +1,4 @@
-package com.wherobots.db.jdbc;
+package com.wherobots.db;
 
 /**
  * Geometry column representation formats.

@@ -1,11 +1,15 @@
 package com.wherobots.db.jdbc;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.wherobots.db.DataCompression;
 import com.wherobots.db.jdbc.internal.Frame;
-import com.wherobots.db.jdbc.internal.JsonUtil;
+import com.wherobots.db.jdbc.models.Event;
+import com.wherobots.db.jdbc.serde.ArrowUtil;
+import com.wherobots.db.jdbc.serde.JsonUtil;
 import com.wherobots.db.jdbc.internal.Query;
-import com.wherobots.db.jdbc.internal.QueryState;
+import com.wherobots.db.jdbc.models.QueryState;
+import com.wherobots.db.jdbc.models.ExecuteSqlRequest;
+import com.wherobots.db.jdbc.models.RetrieveResultsRequest;
+import com.wherobots.db.jdbc.session.WherobotsSession;
 import org.apache.arrow.compression.CommonsCompressionFactory;
 import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
@@ -24,7 +28,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.NClob;
 import java.sql.PreparedStatement;
-import java.sql.SQLClientInfoException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
@@ -43,27 +47,6 @@ import java.util.concurrent.Executor;
 public class WherobotsJdbcConnection implements Connection {
 
     public static final Logger logger = LoggerFactory.getLogger(WherobotsJdbcConnection.class);
-
-    private static final String EXECUTE_SQL_KIND = "execute_sql";
-    private static final String RETRIEVE_RESULTS_KIND = "retrieve_results";
-
-    private static final String KIND = "kind";
-    private static final String EXECUTION_ID = "execution_id";
-    public static final String STATE = "state";
-
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    private record ExecuteSqlRequest(
-            @JsonProperty(KIND) String kind,
-            @JsonProperty(EXECUTION_ID) String executionId,
-            String statement) {}
-
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    private record RetrieveResultsRequest(
-            @JsonProperty(KIND) String kind,
-            @JsonProperty(EXECUTION_ID) String executionId,
-            DataFormat format,
-            DataCompression compression,
-            GeometryRepresentation geometry) {}
 
     private final WherobotsSession session;
     private final ConcurrentMap<String, Query> queries;
@@ -97,60 +80,45 @@ public class WherobotsJdbcConnection implements Connection {
         }
     }
 
-    private void handle(Map<String, Object> message) throws Exception {
-        logger.info("handle({})", message);
-        String kind = (String) message.get(KIND);
-        String executionId = (String) message.get(EXECUTION_ID);
-        if (StringUtils.isBlank(kind) || StringUtils.isBlank(executionId)) {
+    private void handle(Event event) throws Exception {
+        logger.info("Handling event: {}", JsonUtil.serialize(event));
+        if (event.kind == null || event.executionId == null) {
             // Invalid event.
             return;
         }
 
-        Query query = this.queries.get(executionId);
+        Query query = this.queries.get(event.executionId);
         if (query == null) {
-            logger.warn("Received event for unknown query {}.", executionId);
+            logger.warn("Received event for unknown query {}.", event.executionId);
             return;
         }
 
-        switch (kind) {
-            case "state_updated":
-                QueryState status = QueryState.valueOf((String) message.get(STATE));
-                query.setStatus(status);
-                logger.info("Query {} is now {}.", executionId, status);
+        if (event instanceof Event.StateUpdatedEvent) {
+            query.setStatus(event.state);
+            logger.info("Query {} is now {}.", event.executionId, event.state);
 
-                switch (status) {
-                    case succeeded -> this.retrieveResults(executionId);
-                    // TODO: handle FAILED
-                }
+            switch (event.state) {
+                case succeeded -> this.retrieveResults(event.executionId);
+                // TODO: handle FAILED
+            }
 
-                break;
-
-            case "execution_result":
-                Map<String, Object> results = (Map<String, Object>) message.get("results");
-                byte[] data = (byte[]) results.get("result_bytes");
-                String compression = (String) results.get("compression");
-                String format = (String) results.get("format");
-                logger.info(
-                        "Received {} bytes of {}-compressed {} results from {}.",
-                        data.length, compression, format, executionId);
-
-                BufferAllocator rootAllocator = new RootAllocator();
-                ZstdCompressorInputStream stream = new ZstdCompressorInputStream(new ByteArrayInputStream(data));
-                ArrowStreamReader reader = new ArrowStreamReader(stream, rootAllocator, new CommonsCompressionFactory());
-
-                query.statement().onExecutionResult(new WherobotsResultSet(reader));
-                break;
-
-            case "error":
-                query.setStatus(QueryState.failed);
-                String error = (String) message.get("message");
-                logger.warn("Error: {}", error);
-                break;
-
-            default:
-                logger.warn("Received unknown {} event!", kind);
+            return;
         }
 
+        if (event instanceof Event.ExecutionResultEvent) {
+            Event.ExecutionResultEvent ere = (Event.ExecutionResultEvent) event;
+            Event.Results results = ere.results;
+
+            logger.info(
+                    "Received {} bytes of {}-compressed {} results from {}.",
+                    results.resultBytes.length, results.compression, results.format, event.executionId);
+            ArrowStreamReader reader = ArrowUtil.readFrom(results.resultBytes, results.compression);
+            query.statement().onExecutionResult(new WherobotsResultSet(reader));
+
+            return;
+        }
+
+        logger.warn("Received unknown event kind: {}", event.kind);
     }
 
     String execute(String sql, WherobotsStatement statement) {
@@ -162,7 +130,6 @@ public class WherobotsJdbcConnection implements Connection {
                 QueryState.pending));
 
         String request = JsonUtil.serialize(new ExecuteSqlRequest(
-                EXECUTE_SQL_KIND,
                 executionId,
                 sql
         ));
@@ -178,7 +145,6 @@ public class WherobotsJdbcConnection implements Connection {
         }
 
         String request = JsonUtil.serialize(new RetrieveResultsRequest(
-                RETRIEVE_RESULTS_KIND,
                 executionId,
                 null,
                 DataCompression.zstd,
@@ -249,7 +215,8 @@ public class WherobotsJdbcConnection implements Connection {
     }
 
     @Override
-    public DatabaseMetaData getMetaData() throws SQLException {
+    public DatabaseMetaData getMetaData() {
+        // TODO
         return null;
     }
 
@@ -264,12 +231,12 @@ public class WherobotsJdbcConnection implements Connection {
     }
 
     @Override
-    public void setCatalog(String catalog) throws SQLException {
-
+    public void setCatalog(String catalog) {
+        // Ignore, users must specify the catalog in the SQL query.
     }
 
     @Override
-    public String getCatalog() throws SQLException {
+    public String getCatalog() {
         return "";
     }
 
@@ -320,12 +287,12 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void setHoldability(int holdability) throws SQLException {
-
+        throw new SQLFeatureNotSupportedException("Cursor holdability is not supported");
     }
 
     @Override
     public int getHoldability() throws SQLException {
-        return 0;
+        throw new SQLFeatureNotSupportedException("Cursor holdability is not supported");
     }
 
     @Override
@@ -400,27 +367,30 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public boolean isValid(int timeout) throws SQLException {
-        // TODO: send dummy query to validate the connection.
-        return false;
+        Statement stmt = this.createStatement();
+        stmt.setQueryTimeout(timeout);
+        try (ResultSet result = stmt.executeQuery("SELECT 1")) {
+            return result.next();
+        }
     }
 
     @Override
-    public void setClientInfo(String name, String value) throws SQLClientInfoException {
+    public void setClientInfo(String name, String value) {
         this.clientInfo.put(name, value);
     }
 
     @Override
-    public void setClientInfo(Properties properties) throws SQLClientInfoException {
+    public void setClientInfo(Properties properties) {
         this.clientInfo.putAll(properties);
     }
 
     @Override
-    public String getClientInfo(String name) throws SQLException {
+    public String getClientInfo(String name) {
         return (String) this.clientInfo.get(name);
     }
 
     @Override
-    public Properties getClientInfo() throws SQLException {
+    public Properties getClientInfo() {
         return this.clientInfo;
     }
 
@@ -435,27 +405,27 @@ public class WherobotsJdbcConnection implements Connection {
     }
 
     @Override
-    public void setSchema(String schema) throws SQLException {
-
+    public void setSchema(String schema) {
+        // Ignore, users must specify the schema in the SQL query.
     }
 
     @Override
-    public String getSchema() throws SQLException {
+    public String getSchema() {
         return "";
     }
 
     @Override
-    public void abort(Executor executor) throws SQLException {
+    public void abort(Executor executor) {
         this.close();
     }
 
     @Override
-    public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
-
+    public void setNetworkTimeout(Executor executor, int milliseconds) {
+        // No-op
     }
 
     @Override
-    public int getNetworkTimeout() throws SQLException {
+    public int getNetworkTimeout() {
         return 0;
     }
 

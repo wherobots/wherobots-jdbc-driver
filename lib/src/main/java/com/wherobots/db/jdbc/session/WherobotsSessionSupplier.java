@@ -1,8 +1,10 @@
-package com.wherobots.db.jdbc;
+package com.wherobots.db.jdbc.session;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.wherobots.db.jdbc.internal.JsonUtil;
+import com.wherobots.db.Region;
+import com.wherobots.db.Runtime;
+import com.wherobots.db.jdbc.serde.JsonUtil;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.core.functions.CheckedSupplier;
 import io.github.resilience4j.retry.Retry;
@@ -39,6 +41,16 @@ public abstract class WherobotsSessionSupplier {
     private record SqlSessionAppMeta(String url) {}
     private record SqlSessionResponsePayload(String status, SqlSessionAppMeta appMeta) {}
 
+    /**
+     * Requests the creation of a SQL Session from the Wherobots Cloud API, waits for it to be ready, and connects to it.
+     *
+     * @param host
+     * @param runtime
+     * @param region
+     * @param headers
+     * @return
+     * @throws SQLException
+     */
     public static WherobotsSession create(String host, Runtime runtime, Region region, Map<String, String> headers)
         throws SQLException {
         HttpClient client = HttpClient.newBuilder()
@@ -64,6 +76,14 @@ public abstract class WherobotsSessionSupplier {
         }
     }
 
+    /**
+     * Connects to an existing SQL Session directly from its WebSocket URI.
+     *
+     * @param wsUri
+     * @param headers
+     * @return
+     * @throws SQLException
+     */
     public static WherobotsSession create(URI wsUri, Map<String, String> headers)
             throws SQLException {
         logger.info("Connecting to SQL Session at {} ...", wsUri);

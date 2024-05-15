@@ -1,4 +1,4 @@
-package com.wherobots.db.jdbc;
+package com.wherobots.db;
 
 public enum Runtime {
     SEDONA("TINY"),

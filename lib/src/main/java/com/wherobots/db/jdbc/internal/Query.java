@@ -1,7 +1,7 @@
 package com.wherobots.db.jdbc.internal;
 
-import com.wherobots.db.jdbc.WherobotsJdbcConnection;
 import com.wherobots.db.jdbc.WherobotsStatement;
+import com.wherobots.db.jdbc.models.QueryState;
 
 public class Query {
     private final String executionId;

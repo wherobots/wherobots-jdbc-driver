@@ -1,4 +1,4 @@
-package com.wherobots.db.jdbc.internal;
+package com.wherobots.db.jdbc.serde;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;

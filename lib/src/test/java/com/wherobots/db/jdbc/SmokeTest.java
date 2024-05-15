@@ -27,6 +27,7 @@ public class SmokeTest {
 
         Properties props = new Properties();
         props.put(WherobotsJdbcDriver.API_KEY_PROP, args[0]);
+        props.put(WherobotsJdbcDriver.WS_URI_PROP, "wss://wbc.staging.wherobots.com/sql/djrm9bs9uf/s1gb1wyplg91df/1.0.0");
 
         try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.staging.wherobots.com", props)) {
             Statement stmt = conn.createStatement();
