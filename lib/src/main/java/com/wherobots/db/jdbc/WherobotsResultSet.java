@@ -1,5 +1,12 @@
 package com.wherobots.db.jdbc;
 
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -20,9 +27,25 @@ import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Map;
 
 public class WherobotsResultSet implements ResultSet {
+
+    private static final Logger logger = LoggerFactory.getLogger(WherobotsResultSet.class);
+
+    private final ArrowStreamReader reader;
+
+    public WherobotsResultSet(ArrowStreamReader reader) throws IOException {
+        this.reader = reader;
+        Schema schema = reader
+                .getVectorSchemaRoot()
+                .getSchema();
+
+        List<String> fields = schema.getFields().stream().map(Field::getName).toList();
+        logger.info("ResultSet({})", fields);
+    }
+
     @Override
     public boolean next() throws SQLException {
         return false;

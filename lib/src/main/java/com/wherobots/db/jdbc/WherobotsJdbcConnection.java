@@ -1,8 +1,21 @@
 package com.wherobots.db.jdbc;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.wherobots.db.jdbc.internal.Frame;
+import com.wherobots.db.jdbc.internal.JsonUtil;
+import com.wherobots.db.jdbc.internal.Query;
+import com.wherobots.db.jdbc.internal.QueryState;
+import org.apache.arrow.compression.CommonsCompressionFactory;
+import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
@@ -19,63 +32,73 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
-import java.util.logging.Logger;
 
 public class WherobotsJdbcConnection implements Connection {
 
-    public static final Logger logger = Logger.getLogger(WherobotsJdbcConnection.class.getName());
+    public static final Logger logger = LoggerFactory.getLogger(WherobotsJdbcConnection.class);
 
     private static final String EXECUTE_SQL_KIND = "execute_sql";
     private static final String RETRIEVE_RESULTS_KIND = "retrieve_results";
 
     private static final String KIND = "kind";
     private static final String EXECUTION_ID = "execution_id";
+    public static final String STATE = "state";
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private record ExecuteSqlRequest(
             @JsonProperty(KIND) String kind,
             @JsonProperty(EXECUTION_ID) String executionId,
             String statement) {}
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private record RetrieveResultsRequest(
             @JsonProperty(KIND) String kind,
             @JsonProperty(EXECUTION_ID) String executionId,
-            String format,
-            String compression,
-            String geometry) {}
+            DataFormat format,
+            DataCompression compression,
+            GeometryRepresentation geometry) {}
 
     private final WherobotsSession session;
-    private final ConcurrentMap<String, WherobotsStatement> queries;
+    private final ConcurrentMap<String, Query> queries;
+    private final Properties clientInfo;
 
     public WherobotsJdbcConnection(WherobotsSession session) {
         this.session = session;
         this.queries = new ConcurrentHashMap<>();
+        this.clientInfo = new Properties();
 
         Thread thread = new Thread(this::loop);
         thread.setDaemon(true);
+        thread.setName("wherobots-connection");
         thread.start();
     }
 
     private void loop() {
         while (!this.isClosed()) {
-            for (Frame frame : this.session) {
+            Iterator<Frame> iterator = this.session.iterator();
+            while (iterator.hasNext()) {
+                Frame frame = iterator.next();
                 try {
                     this.handle(frame.get());
                 } catch (Exception e) {
-                    logger.severe(e.getMessage());
+                    logger.error(e.getMessage(), e);
                     this.close();
                     return;
                 }
+                iterator.remove();
             }
         }
     }
 
     private void handle(Map<String, Object> message) throws Exception {
+        logger.info("handle({})", message);
         String kind = (String) message.get(KIND);
         String executionId = (String) message.get(EXECUTION_ID);
         if (StringUtils.isBlank(kind) || StringUtils.isBlank(executionId)) {
@@ -83,32 +106,60 @@ public class WherobotsJdbcConnection implements Connection {
             return;
         }
 
-        WherobotsStatement statement = this.queries.get(executionId);
-        if (statement == null) {
-            logger.warning(String.format("Received event for unknown query %s.", executionId));
+        Query query = this.queries.get(executionId);
+        if (query == null) {
+            logger.warn("Received event for unknown query {}.", executionId);
             return;
         }
 
         switch (kind) {
             case "state_updated":
+                QueryState status = QueryState.valueOf((String) message.get(STATE));
+                query.setStatus(status);
+                logger.info("Query {} is now {}.", executionId, status);
+
+                switch (status) {
+                    case succeeded -> this.retrieveResults(executionId);
+                    // TODO: handle FAILED
+                }
+
                 break;
 
             case "execution_result":
-                statement.onExecutionResult(new WherobotsResultSet());
+                Map<String, Object> results = (Map<String, Object>) message.get("results");
+                byte[] data = (byte[]) results.get("result_bytes");
+                String compression = (String) results.get("compression");
+                String format = (String) results.get("format");
+                logger.info(
+                        "Received {} bytes of {}-compressed {} results from {}.",
+                        data.length, compression, format, executionId);
+
+                BufferAllocator rootAllocator = new RootAllocator();
+                ZstdCompressorInputStream stream = new ZstdCompressorInputStream(new ByteArrayInputStream(data));
+                ArrowStreamReader reader = new ArrowStreamReader(stream, rootAllocator, new CommonsCompressionFactory());
+
+                query.statement().onExecutionResult(new WherobotsResultSet(reader));
                 break;
 
             case "error":
+                query.setStatus(QueryState.failed);
+                String error = (String) message.get("message");
+                logger.warn("Error: {}", error);
                 break;
 
             default:
-                logger.warning(String.format("Received unknown %s event!", kind));
+                logger.warn("Received unknown {} event!", kind);
         }
 
     }
 
     String execute(String sql, WherobotsStatement statement) {
         String executionId = UUID.randomUUID().toString();
-        this.queries.put(executionId, statement);
+        this.queries.put(executionId, new Query(
+                executionId,
+                sql,
+                statement,
+                QueryState.pending));
 
         String request = JsonUtil.serialize(new ExecuteSqlRequest(
                 EXECUTE_SQL_KIND,
@@ -116,7 +167,7 @@ public class WherobotsJdbcConnection implements Connection {
                 sql
         ));
 
-        logger.info(String.format("Executing SQL query %s: %s", executionId, request));
+        logger.info("Executing SQL query {}: {}", executionId, request);
         this.session.send(request);
         return executionId;
     }
@@ -130,19 +181,19 @@ public class WherobotsJdbcConnection implements Connection {
                 RETRIEVE_RESULTS_KIND,
                 executionId,
                 null,
-                null,
+                DataCompression.zstd,
                 null
         ));
 
-        logger.info(String.format("Retrieving results from %s ...", executionId));
+        logger.info("Retrieving results from {} ...", executionId);
         this.session.send(request);
     }
 
     void cancel(String executionId) {
-        WherobotsStatement statement = this.queries.remove(executionId);
-        if (statement != null) {
-            statement.close();
-            logger.info(String.format("Cancelled query %s.", executionId));
+        Query query = this.queries.remove(executionId);
+        if (query != null) {
+            query.statement().close();
+            logger.info("Cancelled query {}.", executionId);
         }
     }
 
@@ -355,22 +406,22 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void setClientInfo(String name, String value) throws SQLClientInfoException {
-
+        this.clientInfo.put(name, value);
     }
 
     @Override
     public void setClientInfo(Properties properties) throws SQLClientInfoException {
-
+        this.clientInfo.putAll(properties);
     }
 
     @Override
     public String getClientInfo(String name) throws SQLException {
-        return "";
+        return (String) this.clientInfo.get(name);
     }
 
     @Override
     public Properties getClientInfo() throws SQLException {
-        return null;
+        return this.clientInfo;
     }
 
     @Override

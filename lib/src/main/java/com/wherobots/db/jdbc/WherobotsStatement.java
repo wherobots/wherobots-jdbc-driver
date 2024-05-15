@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 public class WherobotsStatement implements Statement {
 
-    public static final int DEFAULT_QUERY_TIMEOUT_SECONDS = 0; // unlimited
+    public static final int DEFAULT_QUERY_TIMEOUT_SECONDS = 300;
 
     private final BlockingQueue<ResultSet> queue;
     private final WherobotsJdbcConnection connection;
