@@ -1,6 +1,5 @@
 package com.wherobots.db.jdbc.internal;
 
-import java.sql.ResultSet;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
 
-public record ExecutionResult(ResultSet result, Exception error) {
-}
+public record ExecutionResult(ArrowStreamReader result, Exception error) {}

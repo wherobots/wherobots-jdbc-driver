@@ -2,6 +2,7 @@ package com.wherobots.db.jdbc;
 
 import com.wherobots.db.Region;
 import com.wherobots.db.Runtime;
+import com.wherobots.db.jdbc.session.WherobotsSession;
 import com.wherobots.db.jdbc.session.WherobotsSessionSupplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.core5.net.URIBuilder;
@@ -19,13 +20,22 @@ import java.util.Properties;
 public class WherobotsJdbcDriver implements Driver {
 
     private static final String JDBC_PREFIX = "jdbc:";
-    private static final String URL_PREFIX = "jdbc:wherobots://";
+    public static final String URL_PREFIX = JDBC_PREFIX + "wherobots://";
 
     public static final String API_KEY_PROP = "apiKey";
     public static final String TOKEN_PROP = "token";
     public static final String RUNTIME_PROP = "runtime";
     public static final String REGION_PROP = "region";
     public static final String WS_URI_PROP = "wsUri";
+
+    // Results format; one of {@link DataFormat}
+    public static final String FORMAT_PROP = "format";
+
+    // Results compression codec; one of {@link DataCompression}
+    public static final String COMPRESSION_PROP = "compression";
+
+    // Geometry representation format; one of {@link GeometryRepresentation}
+    public static final String GEOMETRY_PROP = "geometry";
 
     public static final String DEFAULT_ENDPOINT = "api.cloud.wherobots.com";
     public static final String STAGING_ENDPOINT = "api.staging.wherobots.com";
@@ -61,18 +71,21 @@ public class WherobotsJdbcDriver implements Driver {
         }
 
         Map<String, String> headers = getAuthHeaders(info);
+        WherobotsSession session;
 
         String wsUriString = info.getProperty(WS_URI_PROP);
         if (StringUtils.isNotBlank(wsUriString)) {
             try {
                 URI wsUri = new URI(wsUriString);
-                return new WherobotsJdbcConnection(WherobotsSessionSupplier.create(wsUri, headers));
+                session = WherobotsSessionSupplier.create(wsUri, headers);
             } catch (URISyntaxException e) {
                 throw new SQLException("Invalid WebSocket URI: " + wsUriString, e);
             }
+        } else {
+            session = WherobotsSessionSupplier.create(host, runtime, region, headers);
         }
 
-        return new WherobotsJdbcConnection(WherobotsSessionSupplier.create(host, runtime, region, headers));
+        return new WherobotsJdbcConnection(session, info);
     }
 
     private Map<String, String> getAuthHeaders(Properties info) {

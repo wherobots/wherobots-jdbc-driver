@@ -2,6 +2,7 @@ package com.wherobots.db.jdbc;
 
 import com.wherobots.db.jdbc.internal.ExecutionResult;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -142,10 +143,12 @@ public class WherobotsStatement implements Statement {
             }
 
             // TODO: differentiate between queries and insert/update/delete results
-            this.results = result.result();
+            this.results = new WherobotsResultSet(this, result.result());
             return true;
         } catch (InterruptedException e) {
             // Pass through
+        } catch (IOException e) {
+            throw new SQLException(e);
         }
 
         throw new SQLTimeoutException();

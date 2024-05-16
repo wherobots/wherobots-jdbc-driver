@@ -1,5 +1,7 @@
 package com.wherobots.db.jdbc;
 
+import com.wherobots.db.GeometryRepresentation;
+
 import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -15,7 +17,7 @@ public class SmokeTest {
         String sql = """
             SELECT
                 id,
-                names['primary'],
+                names['primary'] AS name,
                 geometry,
                 population
             FROM
@@ -32,11 +34,11 @@ public class SmokeTest {
             Statement stmt = conn.createStatement();
             try (ResultSet result = stmt.executeQuery(sql)) {
                 while (result.next()) {
-                    System.out.printf("%s %s %s %d%n",
-                            result.getString(1),
-                            result.getString(2),
-                            result.getString(3),
-                            result.getInt(4)
+                    System.out.printf("%s: %s\t%s\t%12d%n",
+                            result.getString("id"),
+                            result.getString("name"),
+                            result.getString("geometry"),
+                            result.getInt("population")
                     );
                 }
             }

@@ -1,26 +1,22 @@
 package com.wherobots.db.jdbc;
 
 import com.wherobots.db.DataCompression;
+import com.wherobots.db.DataFormat;
+import com.wherobots.db.GeometryRepresentation;
 import com.wherobots.db.jdbc.internal.ExecutionResult;
 import com.wherobots.db.jdbc.internal.Frame;
+import com.wherobots.db.jdbc.internal.Query;
 import com.wherobots.db.jdbc.models.Event;
+import com.wherobots.db.jdbc.models.ExecuteSqlRequest;
+import com.wherobots.db.jdbc.models.QueryState;
+import com.wherobots.db.jdbc.models.RetrieveResultsRequest;
 import com.wherobots.db.jdbc.serde.ArrowUtil;
 import com.wherobots.db.jdbc.serde.JsonUtil;
-import com.wherobots.db.jdbc.internal.Query;
-import com.wherobots.db.jdbc.models.QueryState;
-import com.wherobots.db.jdbc.models.ExecuteSqlRequest;
-import com.wherobots.db.jdbc.models.RetrieveResultsRequest;
 import com.wherobots.db.jdbc.session.WherobotsSession;
-import org.apache.arrow.compression.CommonsCompressionFactory;
-import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
@@ -51,12 +47,12 @@ public class WherobotsJdbcConnection implements Connection {
 
     private final WherobotsSession session;
     private final ConcurrentMap<String, Query> queries;
-    private final Properties clientInfo;
+    private final Properties info;
 
-    public WherobotsJdbcConnection(WherobotsSession session) {
+    public WherobotsJdbcConnection(WherobotsSession session, Properties info) {
         this.session = session;
         this.queries = new ConcurrentHashMap<>();
-        this.clientInfo = new Properties();
+        this.info = info;
 
         Thread thread = new Thread(this::loop);
         thread.setDaemon(true);
@@ -115,7 +111,8 @@ public class WherobotsJdbcConnection implements Connection {
                     "Received {} bytes of {}-compressed {} results from {}.",
                     results.resultBytes.length, results.compression, results.format, event.executionId);
             ArrowStreamReader reader = ArrowUtil.readFrom(results.resultBytes, results.compression);
-            query.statement().onExecutionResult(new ExecutionResult(new WherobotsResultSet(reader), null));
+            query.statement().onExecutionResult(new ExecutionResult(reader, null));
+
             return;
         }
 
@@ -152,9 +149,9 @@ public class WherobotsJdbcConnection implements Connection {
 
         String request = JsonUtil.serialize(new RetrieveResultsRequest(
                 executionId,
-                null,
-                DataCompression.zstd,
-                null
+                (DataFormat) info.get(WherobotsJdbcDriver.FORMAT_PROP),
+                (DataCompression) info.getOrDefault(WherobotsJdbcDriver.COMPRESSION_PROP, DataCompression.zstd),
+                (GeometryRepresentation) info.get(WherobotsJdbcDriver.GEOMETRY_PROP)
         ));
 
         logger.info("Retrieving results from {} ...", executionId);
@@ -282,12 +279,12 @@ public class WherobotsJdbcConnection implements Connection {
     }
 
     @Override
-    public Map<String, Class<?>> getTypeMap() throws SQLException {
+    public Map<String, Class<?>> getTypeMap() {
         return Map.of();
     }
 
     @Override
-    public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
+    public void setTypeMap(Map<String, Class<?>> map) {
 
     }
 
@@ -353,22 +350,22 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public Clob createClob() throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Blob createBlob() throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public NClob createNClob() throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public SQLXML createSQLXML() throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
@@ -382,32 +379,32 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void setClientInfo(String name, String value) {
-        this.clientInfo.put(name, value);
+        this.info.put(name, value);
     }
 
     @Override
     public void setClientInfo(Properties properties) {
-        this.clientInfo.putAll(properties);
+        this.info.putAll(properties);
     }
 
     @Override
     public String getClientInfo(String name) {
-        return (String) this.clientInfo.get(name);
+        return (String) this.info.get(name);
     }
 
     @Override
     public Properties getClientInfo() {
-        return this.clientInfo;
+        return this.info;
     }
 
     @Override
     public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
@@ -437,11 +434,11 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException();
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        return false;
+        throw new SQLFeatureNotSupportedException();
     }
 }

@@ -2,25 +2,35 @@ package com.wherobots.db.jdbc;
 
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.List;
 
-public class WherobotsResultSetMetadata implements ResultSetMetaData {
+public class WherobotsResultSetMetaData implements ResultSetMetaData {
 
-    private static final Logger logger = LoggerFactory.getLogger(WherobotsResultSetMetadata.class);
+    private static final Logger logger = LoggerFactory.getLogger(WherobotsResultSetMetaData.class);
 
     private final Schema schema;
     private final String[] fields;
 
-    public WherobotsResultSetMetadata(Schema schema) {
+    public WherobotsResultSetMetaData(Schema schema) {
         this.schema = schema;
         this.fields = schema.getFields().stream().map(Field::getName).toArray(String[]::new);
         logger.info("ResultSet({})", Arrays.asList(fields));
+    }
+
+    public int getColumnIndex(String name) throws SQLException {
+        for (int i = 0; i < this.fields.length ; i++) {
+            if (StringUtils.equals(name, this.fields[i])) {
+                return i;
+            }
+        }
+
+        throw new SQLException(String.format("Column %s does not exist in schema", name));
     }
 
     @Override
