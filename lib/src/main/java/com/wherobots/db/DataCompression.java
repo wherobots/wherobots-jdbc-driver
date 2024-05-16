@@ -1,6 +1,6 @@
 package com.wherobots.db;
 
-import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream;
+import org.apache.commons.compress.compressors.lz4.BlockLZ4CompressorInputStream;
 import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream;
 
 import java.io.IOException;
@@ -15,7 +15,7 @@ import java.io.InputStream;
  */
 public enum DataCompression {
     none(in -> in),
-    lz4(LZMACompressorInputStream::new),
+    lz4(BlockLZ4CompressorInputStream::new),
     zstd(ZstdCompressorInputStream::new);
 
     // The Java Arrow library doesn't support other compression codecs at this time.
