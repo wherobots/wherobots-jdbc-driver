@@ -195,7 +195,7 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public String getString(String columnLabel) throws SQLException {
-        return get(columnLabel, String.class);
+        return get(columnLabel, Text.class).toString();
     }
 
     @Override
