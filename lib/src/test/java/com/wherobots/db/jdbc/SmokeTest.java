@@ -1,7 +1,5 @@
 package com.wherobots.db.jdbc;
 
-import com.wherobots.db.GeometryRepresentation;
-
 import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -31,8 +29,7 @@ public class SmokeTest {
         props.put(WherobotsJdbcDriver.API_KEY_PROP, args[0]);
 
         try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.staging.wherobots.com", props)) {
-            Statement stmt = conn.createStatement();
-            try (ResultSet result = stmt.executeQuery(sql)) {
+            try (Statement stmt = conn.createStatement(); ResultSet result = stmt.executeQuery(sql)) {
                 while (result.next()) {
                     System.out.printf("%s: %s\t%s\t%12d%n",
                             result.getString("id"),
