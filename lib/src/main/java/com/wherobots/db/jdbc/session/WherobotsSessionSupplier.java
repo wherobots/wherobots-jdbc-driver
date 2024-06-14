@@ -2,6 +2,7 @@ package com.wherobots.db.jdbc.session;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.wherobots.db.AppStatus;
 import com.wherobots.db.Region;
 import com.wherobots.db.Runtime;
 import com.wherobots.db.jdbc.serde.JsonUtil;
@@ -39,7 +40,7 @@ public abstract class WherobotsSessionSupplier {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private record SqlSessionRequestPayload(String runtimeId, Integer shutdownAfterInactiveSeconds) {}
     private record SqlSessionAppMeta(String url) {}
-    private record SqlSessionResponsePayload(String status, SqlSessionAppMeta appMeta) {}
+    private record SqlSessionResponsePayload(AppStatus status, SqlSessionAppMeta appMeta) {}
 
     /**
      * Requests the creation of a SQL Session from the Wherobots Cloud API, waits for it to be ready, and connects to it.
@@ -161,12 +162,16 @@ public abstract class WherobotsSessionSupplier {
             HttpResponse<String> response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
             SqlSessionResponsePayload payload = JsonUtil.deserialize(response.body(), new TypeReference<>() {});
             logger.info("  ... {}", payload.status);
-            return switch (payload.status) {
-                case "REQUESTED", "DEPLOYING", "DEPLOYED", "INITIALIZING" -> null;
-                case "READY" -> httpToWsUri(new URI(String.format("%s/%s", payload.appMeta.url, PROTOCOL_VERSION)));
-                default -> throw new IllegalStateException(
+
+            if (payload.status.isStarting()) {
+                // Return null to indicate to the retry logic we're still waiting for a result.
+                return null;
+            } else if (payload.status == AppStatus.READY) {
+                return httpToWsUri(new URI(String.format("%s/%s", payload.appMeta.url, PROTOCOL_VERSION)));
+            } else {
+                throw new IllegalStateException(
                         String.format("Failed to create SQL session: %s", payload.status));
-            };
+            }
         }
     }
 }
