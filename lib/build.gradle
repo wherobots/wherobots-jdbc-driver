@@ -47,3 +47,8 @@ tasks.named('jar') {
                    'Implementation-Version': project.version)
     }
 }
+
+tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveClassifier.set('')
+    mergeServiceFiles()
+}
