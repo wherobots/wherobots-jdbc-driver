@@ -3,7 +3,7 @@ name: Build and Upload JAR
 on:
   push:
     branches:
-      - master
+      - main
     paths:
       - 'src/**'
       - 'build.gradle'
@@ -15,10 +15,6 @@ on:
       - 'src/**'
       - 'build.gradle'
       - '.github/workflows/main.yml'
-
-env:
-  GRADLE_OPTS: -Dorg.gradle.daemon=false
-  DO_NOT_TRACK: true
 
 permissions:
   contents: read
@@ -40,9 +36,6 @@ jobs:
       - name: Verify Gradle installation
         run: ./gradlew --version
 
-      - name: List initial directory contents
-        run: ls -R
-
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
@@ -51,22 +44,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
       - name: Run build
-        run: ./gradlew build shadowJar
+        run: chmod +x ./gradlew && ./gradlew build shadowJar
         env:
           GRADLE_OPTS: -Dorg.gradle.daemon=false
           DO_NOT_TRACK: true
-
-      - name: List files in project directory
-        run: ls -R
-        shell: bash
-
-      - name: List files in build directory
-        run: ls -R lib/build
-        shell: bash
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
