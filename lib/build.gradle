@@ -44,11 +44,10 @@ java {
 tasks.named('jar') {
     manifest {
         attributes('Implementation-Title': project.name,
-                   'Implementation-Version': project.version)
+                'Implementation-Version': project.version)
     }
 }
 
-tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
-    archiveClassifier.set('')
-    mergeServiceFiles()
+tasks.withType(Jar) {
+    archiveBaseName.set('wherobots-jdbc')
 }
