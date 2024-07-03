@@ -37,7 +37,10 @@ jobs:
           distribution: 'adopt'
           java-version: '17'
 
-      - name: List directory contents
+      - name: Verify Gradle installation
+        run: ./gradlew --version
+
+      - name: List initial directory contents
         run: ls -R
 
       - name: Cache Gradle packages
@@ -50,6 +53,9 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew build shadowJar
+
+      - name: List build directory contents
+        run: ls -R build
 
       - name: Create staging directory
         run: mkdir -p staging
