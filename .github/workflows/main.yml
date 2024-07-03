@@ -25,10 +25,10 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -51,23 +51,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Build with Gradle
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Run build
         run: ./gradlew build shadowJar
+        env:
+          GRADLE_OPTS: -Dorg.gradle.daemon=false
+          DO_NOT_TRACK: true
 
-      - name: List build directory contents
-        run: ls -R build
+      - name: List files in project directory
+        run: ls -R
+        shell: bash
 
-      - name: Create staging directory
-        run: mkdir -p staging
+      - name: List files in build directory
+        run: ls -R lib/build
+        shell: bash
 
-      - name: Copy JAR to staging
-        run: cp build/libs/*.jar staging/
-
-      - name: List staging directory contents
-        run: ls -R staging
-
-      - name: Upload JAR Artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: wherobots-jdbc-driver
-          path: staging/*.jar
+          name: build-artifacts
+          path: lib/build/libs/*.jar
