@@ -53,15 +53,21 @@ jobs:
 
       - name: Build with Gradle
         run: ./gradlew build shadowJar
+        working-directory: ./lib
 
       - name: List build directory contents
         run: ls -R build
+        working-directory: ./lib
 
       - name: Create staging directory
         run: mkdir -p staging
 
       - name: Copy JAR to staging
         run: cp build/libs/*.jar staging/
+        working-directory: ./lib
+
+      - name: List staging directory contents
+        run: ls -R staging
 
       - name: Upload JAR Artifact
         uses: actions/upload-artifact@v3
