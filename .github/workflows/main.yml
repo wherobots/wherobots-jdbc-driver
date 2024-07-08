@@ -1,0 +1,57 @@
+name: Build and Upload JAR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - '.github/workflows/main.yml'
+  pull_request:
+    branches:
+      - '*'
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - '.github/workflows/main.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+
+      - name: Verify Gradle installation
+        run: ./gradlew --version
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Run build
+        run: chmod +x ./gradlew && ./gradlew build shadowJar
+        env:
+          GRADLE_OPTS: -Dorg.gradle.daemon=false
+          DO_NOT_TRACK: true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: lib/build/libs/wherobots-jdbc-*.jar

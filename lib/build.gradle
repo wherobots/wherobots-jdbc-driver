@@ -47,3 +47,7 @@ tasks.named('jar') {
                    'Implementation-Version': project.version)
     }
 }
+
+tasks.withType(Jar) {
+    archiveBaseName.set('wherobots-jdbc')
+}
