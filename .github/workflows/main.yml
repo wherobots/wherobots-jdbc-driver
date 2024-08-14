@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - 'src/**'
+      - 'lib/**'
       - 'build.gradle'
       - '.github/workflows/main.yml'
   pull_request:
     branches:
       - '*'
     paths:
-      - 'src/**'
+      - 'lib/**'
       - 'build.gradle'
       - '.github/workflows/main.yml'
 
@@ -54,4 +54,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: build-artifacts
-          path: lib/build/libs/wherobots-jdbc-*.jar
+          path: lib/build/libs/*.jar
