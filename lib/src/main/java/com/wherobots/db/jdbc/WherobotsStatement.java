@@ -26,7 +26,10 @@ public class WherobotsStatement implements Statement {
 
     private String executionId;
     private ResultSet results;
-    private int updateCount = 0;
+    private int updateCount = -1;
+
+    private boolean closeOnCompletion = false;
+    private boolean closed = false;
 
     public WherobotsStatement(WherobotsJdbcConnection connection) {
         this.connection = connection;
@@ -56,7 +59,11 @@ public class WherobotsStatement implements Statement {
     }
 
     @Override
-    public void close() {
+    public void close() throws SQLException {
+        if (this.results != null) {
+            this.results.close();
+        }
+        this.closed = true;
     }
 
     @Override
@@ -66,7 +73,7 @@ public class WherobotsStatement implements Statement {
 
     @Override
     public void setMaxFieldSize(int max) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        // Ignored
     }
 
     @Override
@@ -85,7 +92,9 @@ public class WherobotsStatement implements Statement {
 
     @Override
     public void setEscapeProcessing(boolean enable) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        if (enable) {
+            throw new SQLFeatureNotSupportedException("setEscapeProcessing: escape processing is not supported");
+        }
     }
 
     @Override
@@ -103,7 +112,7 @@ public class WherobotsStatement implements Statement {
     }
 
     @Override
-    public void cancel() {
+    public void cancel() throws SQLException {
         if (this.executionId != null) {
             this.connection.cancel(this.executionId);
         }
@@ -166,12 +175,18 @@ public class WherobotsStatement implements Statement {
 
     @Override
     public boolean getMoreResults() throws SQLException {
-        throw new SQLFeatureNotSupportedException("Multiple result sets are not supported");
+        if (this.results != null) {
+            this.results.close();
+            if (this.closeOnCompletion) {
+                close();
+            }
+        }
+        return false;
     }
 
     @Override
     public void setFetchDirection(int direction) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        // Ignored
     }
 
     @Override
@@ -181,7 +196,7 @@ public class WherobotsStatement implements Statement {
 
     @Override
     public void setFetchSize(int rows) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        // Ignored
     }
 
     @Override
@@ -221,11 +236,11 @@ public class WherobotsStatement implements Statement {
 
     @Override
     public boolean getMoreResults(int current) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Multiple result sets are not supported");
+        return getMoreResults();
     }
 
     @Override
-    public ResultSet getGeneratedKeys() throws SQLException {
+    public ResultSet getGeneratedKeys() {
         return null;
     }
 
@@ -266,12 +281,12 @@ public class WherobotsStatement implements Statement {
 
     @Override
     public boolean isClosed() {
-        return false;
+        return closed;
     }
 
     @Override
     public void setPoolable(boolean poolable) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        // Ignored
     }
 
     @Override
@@ -281,12 +296,12 @@ public class WherobotsStatement implements Statement {
 
     @Override
     public void closeOnCompletion() throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        this.closeOnCompletion = true;
     }
 
     @Override
     public boolean isCloseOnCompletion() {
-        return false;
+        return closeOnCompletion;
     }
 
     @Override

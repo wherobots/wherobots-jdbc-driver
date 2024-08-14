@@ -11,6 +11,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -95,7 +96,9 @@ public class WherobotsResultSet implements ResultSet {
     private <T> T get(int columnIndex, Class<T> cls) throws SQLException {
         try {
             Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
-            Object value = root.getVector(columnIndex).getObject(currentVectorRow);
+
+            // Column index is 1-based in JDBC
+            Object value = root.getVector(columnIndex - 1).getObject(currentVectorRow);
             this.wasNull = value == null;
             return cls.cast(value);
         } catch (Exception e) {
@@ -189,7 +192,9 @@ public class WherobotsResultSet implements ResultSet {
             Object value = root.getVector(columnLabel).getObject(currentVectorRow);
             return cls.cast(value);
         } catch (Exception e) {
-            throw new SQLException(e);
+            throw new SQLException(
+                    String.format("Error accessing column %s from current row %d of resultset", columnLabel, currentRow),
+                    e);
         }
     }
 
@@ -235,7 +240,7 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        throw new SQLFeatureNotSupportedException("BigDecimal isn't supported");
     }
 
     @Override
@@ -295,12 +300,12 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public Object getObject(int columnIndex) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return get(columnIndex, Object.class);
     }
 
     @Override
     public Object getObject(String columnLabel) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return get(columnLabel, Object.class);
     }
 
     @Override
@@ -310,12 +315,12 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public Reader getCharacterStream(int columnIndex) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return new StringReader(getString(columnIndex));
     }
 
     @Override
     public Reader getCharacterStream(String columnLabel) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return new StringReader(getString(columnLabel));
     }
 
     @Override

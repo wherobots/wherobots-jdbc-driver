@@ -19,8 +19,12 @@ import java.util.Properties;
 
 public class WherobotsJdbcDriver implements Driver {
 
+    public static final String DRIVER_NAME = "wherobots";
+    public static final int MAJOR_VERSION = 0;
+    public static final int MINOR_VERSION = 1;
+
     private static final String JDBC_PREFIX = "jdbc:";
-    public static final String URL_PREFIX = JDBC_PREFIX + "wherobots://";
+    public static final String URL_PREFIX = JDBC_PREFIX + DRIVER_NAME + "://";
 
     public static final String API_KEY_PROP = "apiKey";
     public static final String TOKEN_PROP = "token";
@@ -42,9 +46,6 @@ public class WherobotsJdbcDriver implements Driver {
 
     public static final Runtime DEFAULT_RUNTIME = Runtime.SEDONA;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
-
-    private static final int MAJOR_VERSION = 1;
-    private static final int MINOR_VERSION = 0;
 
     @Override
     public Connection connect(String url, Properties info) throws SQLException {

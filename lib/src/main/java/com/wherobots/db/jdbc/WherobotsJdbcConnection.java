@@ -158,7 +158,7 @@ public class WherobotsJdbcConnection implements Connection {
         this.session.send(request);
     }
 
-    void cancel(String executionId) {
+    void cancel(String executionId) throws SQLException {
         Query query = this.queries.remove(executionId);
         if (query != null) {
             query.statement().close();
@@ -173,13 +173,12 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public PreparedStatement prepareStatement(String sql) throws SQLException {
-        // TODO
-        throw new SQLFeatureNotSupportedException();
+        return new WherobotsPreparedStatement(this, sql);
     }
 
     @Override
     public CallableStatement prepareCall(String sql) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Stored procedures are not supported");
+        throw new SQLFeatureNotSupportedException("prepareCall: stored procedures are not supported");
     }
 
     @Override
@@ -189,22 +188,22 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void setAutoCommit(boolean autoCommit) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        // No-op
     }
 
     @Override
     public boolean getAutoCommit() {
-        return false;
+        return true;
     }
 
     @Override
     public void commit() throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        // No-op
     }
 
     @Override
     public void rollback() throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        // No-op
     }
 
     @Override
@@ -219,13 +218,12 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public DatabaseMetaData getMetaData() {
-        // TODO
-        return null;
+        return new WherobotsDatabaseMetaData(this, this.session);
     }
 
     @Override
     public void setReadOnly(boolean readOnly) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Read-only mode is not supported");
+        throw new SQLFeatureNotSupportedException("setReadOnly: read-only mode is not supported");
     }
 
     @Override
@@ -234,18 +232,18 @@ public class WherobotsJdbcConnection implements Connection {
     }
 
     @Override
-    public void setCatalog(String catalog) {
-        // Ignore, users must specify the catalog in the SQL query.
+    public void setCatalog(String catalog) throws SQLException {
+        // No-op
     }
 
     @Override
     public String getCatalog() {
-        return "";
+        return null;
     }
 
     @Override
     public void setTransactionIsolation(int level) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        throw new SQLFeatureNotSupportedException("setTransactionIsolation: transactions are not supported");
     }
 
     @Override
@@ -265,22 +263,30 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        if (resultSetType != ResultSet.TYPE_FORWARD_ONLY || resultSetConcurrency != ResultSet.CONCUR_READ_ONLY) {
+            throw new SQLFeatureNotSupportedException("createStatement: unsupported statement parameters");
+        }
+
+        return createStatement();
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        if (resultSetType != ResultSet.TYPE_FORWARD_ONLY || resultSetConcurrency != ResultSet.CONCUR_READ_ONLY) {
+            throw new SQLFeatureNotSupportedException("prepareStatement: unsupported statement parameters");
+        }
+
+        return prepareStatement(sql);
     }
 
     @Override
     public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        throw new SQLFeatureNotSupportedException("prepareCall: stored procedures are not supported");
     }
 
     @Override
-    public Map<String, Class<?>> getTypeMap() {
-        return Map.of();
+    public Map<String, Class<?>> getTypeMap() throws SQLException {
+        throw new SQLFeatureNotSupportedException("getTypeMap: custom type mappings are not supported");
     }
 
     @Override
@@ -290,62 +296,70 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public void setHoldability(int holdability) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Cursor holdability is not supported");
+        throw new SQLFeatureNotSupportedException("setHoldability: cursor holdability is not supported");
     }
 
     @Override
     public int getHoldability() throws SQLException {
-        throw new SQLFeatureNotSupportedException("Cursor holdability is not supported");
+        throw new SQLFeatureNotSupportedException("getHoldability: cursor holdability is not supported");
     }
 
     @Override
     public Savepoint setSavepoint() throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        throw new SQLFeatureNotSupportedException("setSavepoint: transactions are not supported");
     }
 
     @Override
     public Savepoint setSavepoint(String name) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        throw new SQLFeatureNotSupportedException("setSavepoint: transactions are not supported");
     }
 
     @Override
     public void rollback(Savepoint savepoint) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        throw new SQLFeatureNotSupportedException("rollback: transactions are not supported");
     }
 
     @Override
     public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Transactions are not supported");
+        throw new SQLFeatureNotSupportedException("releaseSavepoint: ransactions are not supported");
     }
 
     @Override
     public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        if (resultSetConcurrency != ResultSet.CONCUR_READ_ONLY) {
+            throw new SQLFeatureNotSupportedException("createStatement: unsupported statement parameters");
+        }
+
+        return createStatement(resultSetType, resultSetConcurrency);
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        if (resultSetConcurrency != ResultSet.CONCUR_READ_ONLY) {
+            throw new SQLFeatureNotSupportedException("prepareStatement: unsupported statement parameters");
+        }
+
+        return prepareStatement(sql, resultSetType, resultSetConcurrency);
     }
 
     @Override
     public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Stored procedures are not supported");
+        throw new SQLFeatureNotSupportedException("prepareCall: stored procedures are not supported");
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        return prepareStatement(sql);
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        throw new SQLFeatureNotSupportedException("prepareStatement(sql, columnIndexes)");
     }
 
     @Override
     public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
+        throw new SQLFeatureNotSupportedException("prepareStatement(sql, columnNames)");
     }
 
     @Override
@@ -414,7 +428,7 @@ public class WherobotsJdbcConnection implements Connection {
 
     @Override
     public String getSchema() {
-        return "";
+        return null;
     }
 
     @Override
