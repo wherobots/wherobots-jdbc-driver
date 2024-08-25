@@ -9,13 +9,41 @@
 plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
     id 'java-library'
+    id 'net.thebugmc.gradle.sonatype-central-portal-publisher' version '1.2.4'
+    id 'signing'
 }
 
+description = 'JDBC driver for the Wherobots Cloud Spatial SQL API'
+group = 'com.wherobots.jdbc'
 version = '0.1.0'
 
 repositories {
-    // Use Maven Central for resolving dependencies.
     mavenCentral()
+}
+
+centralPortal {
+    username = System.getenv('OSSRH_USERNAME')
+    password = System.getenv('OSSRH_PASSWORD')
+
+    pom {
+        url = 'https://www.wherobots.com'
+        licenses {
+            license {
+                name = 'The Apache License, Version 2.0'
+                url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+          }
+        }
+        developers {
+            developer {
+                name = 'Wherobots Inc.'
+                email = 'info@wherobots.com'
+            }
+        }
+        scm {
+            connection = 'scm:git:https://github.com/wherobots/wherobots-jdbc-driver'
+            url = 'https://github.com/wherobots/wherobots-jdbc-driver'
+        }
+    }
 }
 
 dependencies {
@@ -42,12 +70,16 @@ java {
 }
 
 tasks.named('jar') {
+    archiveBaseName.set('wherobots-jdbc-driver')
     manifest {
-        attributes('Implementation-Title': project.name,
+        attributes('Implementation-Title': rootProject.name,
                    'Implementation-Version': project.version)
     }
 }
 
 tasks.withType(Jar) {
-    archiveBaseName.set('wherobots-jdbc')
+}
+
+signing {
+    useGpgCmd()
 }
