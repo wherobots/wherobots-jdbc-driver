@@ -1,16 +1,16 @@
 package com.wherobots.db;
 
 public enum Runtime {
-    SEDONA("TINY"),
-    SAN_FRANCISCO("SMALL"),
-    NEW_YORK("MEDIUM"),
-    CAIRO("LARGE"),
-    DELHI("XLARGE"),
-    TOKYO("XXLARGE"),
+    SEDONA("tiny"),
+    SAN_FRANCISCO("small"),
+    NEW_YORK("medium"),
+    CAIRO("large"),
+    DELHI("x-large"),
+    TOKYO("2x-large"),
 
     NEW_YORK_HIMEM("medium-himem"),
     CAIRO_HIMEM("large-himem"),
-    DEHLI_HIMEM("xlarge-himem"),
+    DEHLI_HIMEM("x-large-himem"),
     TOKYO_HIMEM("2x-large-himem"),
     ATLANTIS_HIMEM("4x-large-himem"),
 
