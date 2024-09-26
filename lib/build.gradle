@@ -30,6 +30,9 @@ dependencies {
     implementation 'org.apache.arrow:arrow-memory-netty:16.1.0'
     implementation 'io.github.resilience4j:resilience4j-retry:2.2.0'
     implementation 'org.slf4j:slf4j-simple:2.0.13'
+    // Test dependencies
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
@@ -50,4 +53,8 @@ tasks.named('jar') {
 
 tasks.withType(Jar) {
     archiveBaseName.set('wherobots-jdbc')
+}
+
+test {
+    useJUnitPlatform()
 }

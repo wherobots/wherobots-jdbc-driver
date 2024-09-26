@@ -14,6 +14,7 @@ import java.sql.Driver;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -47,6 +48,18 @@ public class WherobotsJdbcDriver implements Driver {
     public static final Runtime DEFAULT_RUNTIME = Runtime.SEDONA;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
 
+    public Map<String, String> getUserAgentHeader() {
+        String javaVersion = System.getProperty("java.version");
+        String osName = System.getProperty("os.name");
+        String packageVersion = getClass().getPackage().getImplementationVersion();
+        if (packageVersion == null) {
+            packageVersion = "unknown";
+        }
+        String userAgent = String.format("wherobots-jdbc-driver/%s os/%s java/%s",
+                packageVersion, osName, javaVersion);
+        return Map.of("User-Agent", userAgent);
+    }
+
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         String host = DEFAULT_ENDPOINT;
@@ -70,8 +83,8 @@ public class WherobotsJdbcDriver implements Driver {
         if (StringUtils.isNotBlank(regionName)) {
             region = Region.valueOf(regionName);
         }
-
-        Map<String, String> headers = getAuthHeaders(info);
+        Map<String, String> headers = new HashMap<>(getAuthHeaders(info));
+        headers.putAll(getUserAgentHeader());
         WherobotsSession session;
 
         String wsUriString = info.getProperty(WS_URI_PROP);
