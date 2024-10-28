@@ -31,3 +31,6 @@ build
 
 # IntelliJ
 .idea/
+
+# Vim
+*.swp
