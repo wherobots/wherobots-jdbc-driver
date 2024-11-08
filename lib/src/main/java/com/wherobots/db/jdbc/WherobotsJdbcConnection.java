@@ -6,6 +6,7 @@ import com.wherobots.db.GeometryRepresentation;
 import com.wherobots.db.jdbc.internal.ExecutionResult;
 import com.wherobots.db.jdbc.internal.Frame;
 import com.wherobots.db.jdbc.internal.Query;
+import com.wherobots.db.jdbc.models.CancelRequest;
 import com.wherobots.db.jdbc.models.Event;
 import com.wherobots.db.jdbc.models.ExecuteSqlRequest;
 import com.wherobots.db.jdbc.models.QueryState;
@@ -96,6 +97,7 @@ public class WherobotsJdbcConnection implements Connection {
 
             switch (event.state) {
                 case succeeded -> this.retrieveResults(event.executionId);
+                case cancelled -> query.statement().onExecutionResult(new ExecutionResult(null, null));
                 case failed -> {
                     // No-op, error event will follow.
                 }
@@ -106,13 +108,13 @@ public class WherobotsJdbcConnection implements Connection {
 
         if (event instanceof Event.ExecutionResultEvent ere) {
             Event.Results results = ere.results;
-
-            logger.info(
-                    "Received {} bytes of {}-compressed {} results from {}.",
-                    results.resultBytes.length, results.compression, results.format, event.executionId);
-            ArrowStreamReader reader = ArrowUtil.readFrom(results.resultBytes, results.compression);
-            query.statement().onExecutionResult(new ExecutionResult(reader, null));
-
+            if (results != null) {
+                logger.info(
+                        "Received {} bytes of {}-compressed {} results from {}.",
+                        results.resultBytes.length, results.compression, results.format, event.executionId);
+                ArrowStreamReader reader = ArrowUtil.readFrom(results.resultBytes, results.compression);
+                query.statement().onExecutionResult(new ExecutionResult(reader, null));
+            }
             return;
         }
 
@@ -159,11 +161,14 @@ public class WherobotsJdbcConnection implements Connection {
     }
 
     void cancel(String executionId) throws SQLException {
-        Query query = this.queries.remove(executionId);
-        if (query != null) {
-            query.statement().close();
-            logger.info("Cancelled query {}.", executionId);
+        Query query = this.queries.get(executionId);
+        if (query == null) {
+            return;
         }
+
+        String request = JsonUtil.serialize(new CancelRequest(executionId));
+        this.session.send(request);
+        logger.info("Cancelled query {}.", executionId);
     }
 
     @Override

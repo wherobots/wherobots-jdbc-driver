@@ -31,6 +31,7 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String TOKEN_PROP = "token";
     public static final String RUNTIME_PROP = "runtime";
     public static final String REGION_PROP = "region";
+    public static final String REUSE_SESSION_PROP = "reuseSession";
     public static final String WS_URI_PROP = "wsUri";
 
     // Results format; one of {@link DataFormat}
@@ -45,8 +46,9 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String DEFAULT_ENDPOINT = "api.cloud.wherobots.com";
     public static final String STAGING_ENDPOINT = "api.staging.wherobots.com";
 
-    public static final Runtime DEFAULT_RUNTIME = Runtime.SEDONA;
+    public static final Runtime DEFAULT_RUNTIME = Runtime.TINY;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
+    public static final boolean DEFAULT_REUSE_SESSION = true;
 
     public Map<String, String> getUserAgentHeader() {
         String javaVersion = System.getProperty("java.version");
@@ -83,6 +85,13 @@ public class WherobotsJdbcDriver implements Driver {
         if (StringUtils.isNotBlank(regionName)) {
             region = Region.valueOf(regionName);
         }
+
+        boolean reuse = DEFAULT_REUSE_SESSION;
+        String reuseSession = info.getProperty(REUSE_SESSION_PROP);
+        if (StringUtils.isNotBlank(reuseSession)) {
+            reuse = Boolean.parseBoolean(reuseSession);
+        }
+
         Map<String, String> headers = new HashMap<>(getAuthHeaders(info));
         headers.putAll(getUserAgentHeader());
         WherobotsSession session;
@@ -96,7 +105,7 @@ public class WherobotsJdbcDriver implements Driver {
                 throw new SQLException("Invalid WebSocket URI: " + wsUriString, e);
             }
         } else {
-            session = WherobotsSessionSupplier.create(host, runtime, region, headers);
+            session = WherobotsSessionSupplier.create(host, runtime, region, reuse, headers);
         }
 
         return new WherobotsJdbcConnection(session, info);
