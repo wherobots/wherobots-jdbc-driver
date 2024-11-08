@@ -27,6 +27,7 @@ public class SmokeTest {
 
         Properties props = new Properties();
         props.put(WherobotsJdbcDriver.API_KEY_PROP, args[0]);
+        props.put(WherobotsJdbcDriver.REUSE_SESSION_PROP, "true");
 
         try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.staging.wherobots.com", props)) {
             try (Statement stmt = conn.createStatement(); ResultSet result = stmt.executeQuery(sql)) {

@@ -34,7 +34,7 @@ public abstract class WherobotsSessionSupplier {
 
     private static final Logger logger = LoggerFactory.getLogger(WherobotsSessionSupplier.class);
 
-    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?region=%s";
+    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?region=%s&reuse_session=%s";
     private static final String PROTOCOL_VERSION = "1.0.0";
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -52,7 +52,7 @@ public abstract class WherobotsSessionSupplier {
      * @return
      * @throws SQLException
      */
-    public static WherobotsSession create(String host, Runtime runtime, Region region, Map<String, String> headers)
+    public static WherobotsSession create(String host, Runtime runtime, Region region, boolean reuse, Map<String, String> headers)
         throws SQLException {
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -67,7 +67,7 @@ public abstract class WherobotsSessionSupplier {
         Retry retry = RetryRegistry.of(config).retry("session");
 
         try {
-            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region).get();
+            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, reuse).get();
             URI wsUri = Retry.decorateCheckedSupplier(retry, new SessionWsUriSupplier(client, headers, sessionIdUri)).get();
             return create(wsUri, headers);
         } catch (SQLException e) {
@@ -102,25 +102,27 @@ public abstract class WherobotsSessionSupplier {
                                       Map<String, String> headers,
                                       String host,
                                       Runtime runtime,
-                                      Region region)
+                                      Region region,
+                                      boolean reuse)
             implements CheckedSupplier<URI> {
 
         @Override
         public URI get() throws IOException, InterruptedException {
-            logger.info("Requesting {}/{} runtime in {} from {}...", runtime, runtime.name, region, host);
+            logger.info("{} {} runtime in {} from {}...",
+                    reuse ? "Recycling" : "Requesting", runtime.name, region.name, host);
 
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(
                     JsonUtil.serialize(new SqlSessionRequestPayload(runtime.name, null)));
 
             HttpRequest.Builder request = HttpRequest.newBuilder()
                     .POST(body)
-                    .uri(URI.create(String.format(SQL_SESSION_ENDPOINT, host, region.name)))
+                    .uri(URI.create(String.format(SQL_SESSION_ENDPOINT, host, region.name, reuse)))
                     .header("Content-Type", "application/json");
             headers.forEach(request::header);
 
             HttpResponse<String> response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != HttpStatus.SC_OK) {
-                throw new IllegalStateException();
+                throw new IllegalStateException(String.format("Got %d from SQL session at %s.", response.statusCode(), host));
             }
             return response.uri();
         }
