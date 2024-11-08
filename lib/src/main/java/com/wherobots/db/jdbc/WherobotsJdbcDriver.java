@@ -45,7 +45,7 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String DEFAULT_ENDPOINT = "api.cloud.wherobots.com";
     public static final String STAGING_ENDPOINT = "api.staging.wherobots.com";
 
-    public static final Runtime DEFAULT_RUNTIME = Runtime.SEDONA;
+    public static final Runtime DEFAULT_RUNTIME = Runtime.TINY;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
 
     public Map<String, String> getUserAgentHeader() {
