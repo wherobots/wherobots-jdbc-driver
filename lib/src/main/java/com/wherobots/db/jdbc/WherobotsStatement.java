@@ -24,7 +24,7 @@ public class WherobotsStatement implements Statement {
     private int timeoutSeconds = DEFAULT_QUERY_TIMEOUT_SECONDS;
     private int maxRows = 0;
 
-    private String executionId;
+    private volatile String executionId;
     private ResultSet results;
     private int updateCount = -1;
 
@@ -149,6 +149,10 @@ public class WherobotsStatement implements Statement {
 
             if (result.error() != null) {
                 throw new SQLException(result.error());
+            }
+
+            if (result.result() == null) {
+                return false;
             }
 
             // TODO: differentiate between queries and insert/update/delete results

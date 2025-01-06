@@ -27,16 +27,34 @@ public class SmokeTest {
 
         Properties props = new Properties();
         props.put(WherobotsJdbcDriver.API_KEY_PROP, args[0]);
+        props.put(WherobotsJdbcDriver.REUSE_SESSION_PROP, "true");
 
         try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.staging.wherobots.com", props)) {
-            try (Statement stmt = conn.createStatement(); ResultSet result = stmt.executeQuery(sql)) {
-                while (result.next()) {
-                    System.out.printf("%s: %s\t%s\t%12d%n",
-                            result.getString("id"),
-                            result.getString("name"),
-                            result.getString("geometry"),
-                            result.getInt("population")
-                    );
+            try (Statement stmt = conn.createStatement()) {
+                new Thread(() -> {
+                    try {
+                        System.out.println("Cancelling query in 2s!");
+                        Thread.sleep(2000L);
+                        stmt.cancel();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+
+                boolean hasResult = stmt.execute(sql);
+                if (!hasResult) {
+                    return;
+                }
+
+                try (ResultSet result = stmt.getResultSet()) {
+                    while (result.next()) {
+                        System.out.printf("%s: %s\t%s\t%12d%n",
+                                result.getString("id"),
+                                result.getString("name"),
+                                result.getString("geometry"),
+                                result.getInt("population")
+                        );
+                    }
                 }
             }
         }
