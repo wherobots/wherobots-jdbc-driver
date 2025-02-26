@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.wherobots.db.AppStatus;
 import com.wherobots.db.Region;
 import com.wherobots.db.Runtime;
+import com.wherobots.db.SessionType;
 import com.wherobots.db.jdbc.serde.JsonUtil;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.core.functions.CheckedSupplier;
@@ -34,11 +35,14 @@ public abstract class WherobotsSessionSupplier {
 
     private static final Logger logger = LoggerFactory.getLogger(WherobotsSessionSupplier.class);
 
-    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?region=%s&reuse_session=%s";
+    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?region=%s";
     private static final String PROTOCOL_VERSION = "1.0.0";
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    private record SqlSessionRequestPayload(String runtimeId, Integer shutdownAfterInactiveSeconds) {}
+    private record SqlSessionRequestPayload(
+        String runtimeId,
+        Integer shutdownAfterInactiveSeconds,
+        String sessionType) {}
     private record SqlSessionAppMeta(String url) {}
     private record SqlSessionResponsePayload(AppStatus status, SqlSessionAppMeta appMeta) {}
 
@@ -52,7 +56,7 @@ public abstract class WherobotsSessionSupplier {
      * @return
      * @throws SQLException
      */
-    public static WherobotsSession create(String host, Runtime runtime, Region region, boolean reuse, Map<String, String> headers)
+    public static WherobotsSession create(String host, Runtime runtime, Region region, SessionType sessionType, Map<String, String> headers)
         throws SQLException {
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -67,7 +71,7 @@ public abstract class WherobotsSessionSupplier {
         Retry retry = RetryRegistry.of(config).retry("session");
 
         try {
-            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, reuse).get();
+            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, sessionType).get();
             URI wsUri = Retry.decorateCheckedSupplier(retry, new SessionWsUriSupplier(client, headers, sessionIdUri)).get();
             return create(wsUri, headers);
         } catch (SQLException e) {
@@ -103,20 +107,23 @@ public abstract class WherobotsSessionSupplier {
                                       String host,
                                       Runtime runtime,
                                       Region region,
-                                      boolean reuse)
+                                      SessionType sessionType)
             implements CheckedSupplier<URI> {
 
         @Override
         public URI get() throws IOException, InterruptedException {
-            logger.info("{} {} runtime in {} from {}...",
-                    reuse ? "Recycling" : "Requesting", runtime.name, region.name, host);
+            logger.info("Requesting {} runtime using {} session type in {} from {}...",
+                    runtime.name, sessionType.name, region.name, host);
 
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(
-                    JsonUtil.serialize(new SqlSessionRequestPayload(runtime.name, null)));
+                    JsonUtil.serialize(new SqlSessionRequestPayload(
+                        runtime.name,
+                        null,
+                        sessionType.name)));
 
             HttpRequest.Builder request = HttpRequest.newBuilder()
                     .POST(body)
-                    .uri(URI.create(String.format(SQL_SESSION_ENDPOINT, host, region.name, reuse)))
+                    .uri(URI.create(String.format(SQL_SESSION_ENDPOINT, host, region.name)))
                     .header("Content-Type", "application/json");
             headers.forEach(request::header);
 

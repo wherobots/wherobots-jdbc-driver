@@ -15,7 +15,7 @@ plugins {
 
 description = 'JDBC driver for the Wherobots Cloud Spatial SQL API'
 group = 'com.wherobots.jdbc'
-version = '0.1.0'
+version = '0.1.1'
 
 repositories {
     mavenCentral()
@@ -89,4 +89,17 @@ signing {
 
 test {
     useJUnitPlatform()
+}
+
+// Run this task with `./gradlew runSmokeTest -Papikey=<your_api_key>`
+task runSmokeTest {
+    group = 'SmokeTest'
+    doLast {
+        tasks.create('runSmokeTestExec', JavaExec) {
+            main = 'com.wherobots.db.jdbc.SmokeTest'
+            args = ["$apikey"]
+            classpath = sourceSets.test.runtimeClasspath
+            jvmArgs = ["--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED"]
+        }.exec()
+    }
 }

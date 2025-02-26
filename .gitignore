@@ -32,5 +32,8 @@ build
 # IntelliJ
 .idea/
 
+# VSCode
+.vscode/
+
 # Vim
 *.swp
