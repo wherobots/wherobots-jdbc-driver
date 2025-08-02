@@ -29,6 +29,11 @@ replay_pid*
 # Ignore Gradle build output directory
 build
 
+# Eclipse / JLS
+.classpath
+.project
+.settings
+
 # IntelliJ
 .idea/
 
