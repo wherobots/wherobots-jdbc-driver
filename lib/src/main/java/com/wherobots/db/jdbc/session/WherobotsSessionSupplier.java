@@ -42,6 +42,7 @@ public abstract class WherobotsSessionSupplier {
     private record SqlSessionRequestPayload(
         String runtimeId,
         Integer shutdownAfterInactiveSeconds,
+        String version,
         String sessionType) {}
     private record SqlSessionAppMeta(String url) {}
     private record SqlSessionResponsePayload(AppStatus status, SqlSessionAppMeta appMeta) {}
@@ -52,11 +53,14 @@ public abstract class WherobotsSessionSupplier {
      * @param host
      * @param runtime
      * @param region
+     * @param version
+     * @param sessionType
      * @param headers
      * @return
      * @throws SQLException
      */
-    public static WherobotsSession create(String host, Runtime runtime, Region region, SessionType sessionType, Map<String, String> headers)
+    public static WherobotsSession create(String host, Runtime runtime, Region region,
+            String version, SessionType sessionType, Map<String, String> headers)
         throws SQLException {
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -71,7 +75,7 @@ public abstract class WherobotsSessionSupplier {
         Retry retry = RetryRegistry.of(config).retry("session");
 
         try {
-            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, sessionType).get();
+            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, version, sessionType).get();
             URI wsUri = Retry.decorateCheckedSupplier(retry, new SessionWsUriSupplier(client, headers, sessionIdUri)).get();
             return create(wsUri, headers);
         } catch (SQLException e) {
@@ -107,18 +111,20 @@ public abstract class WherobotsSessionSupplier {
                                       String host,
                                       Runtime runtime,
                                       Region region,
+                                      String version,
                                       SessionType sessionType)
             implements CheckedSupplier<URI> {
 
         @Override
         public URI get() throws IOException, InterruptedException {
-            logger.info("Requesting {} runtime using {} session type in {} from {}...",
-                    runtime.name, sessionType.name, region.name, host);
+            logger.info("Requesting {} runtime using {} session type running {} in {} from {}...",
+                    runtime.name, sessionType.name, version, region.name, host);
 
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(
                     JsonUtil.serialize(new SqlSessionRequestPayload(
                         runtime.name,
                         null,
+                        version,
                         sessionType.name)));
 
             HttpRequest.Builder request = HttpRequest.newBuilder()
