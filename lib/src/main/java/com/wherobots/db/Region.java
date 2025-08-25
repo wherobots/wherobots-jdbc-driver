@@ -6,7 +6,10 @@ public enum Region {
     AWS_US_EAST_1("aws-us-east-1"),
 
     // EMEA
-    AWS_EU_WEST_1("aws-eu-west-1");
+    AWS_EU_WEST_1("aws-eu-west-1"),
+
+    // APAC
+    AWS_AP_SOUTH_1("aws-ap-south-1");
 
     public final String name;
 
