@@ -32,6 +32,7 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String TOKEN_PROP = "token";
     public static final String RUNTIME_PROP = "runtime";
     public static final String REGION_PROP = "region";
+    public static final String VERSION_PROP = "version";
     public static final String SESSION_TYPE_PROP = "sessionType";
     public static final String WS_URI_PROP = "wsUri";
 
@@ -49,6 +50,7 @@ public class WherobotsJdbcDriver implements Driver {
 
     public static final Runtime DEFAULT_RUNTIME = Runtime.TINY;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
+    public static final String DEFAULT_VERSION = "latest";
     public static final SessionType DEFAULT_SESSION_TYPE = SessionType.SINGLE;
 
     public Map<String, String> getUserAgentHeader() {
@@ -87,6 +89,12 @@ public class WherobotsJdbcDriver implements Driver {
             region = Region.valueOf(regionName);
         }
 
+        String version = DEFAULT_VERSION;
+        String givenVersion = info.getProperty(VERSION_PROP);
+        if (StringUtils.isNotBlank(givenVersion)) {
+            version = givenVersion;
+        }
+
         SessionType sessionType = DEFAULT_SESSION_TYPE;
         String sessionTypeName = info.getProperty(SESSION_TYPE_PROP);
         if (StringUtils.isNotBlank(sessionTypeName)) {
@@ -106,7 +114,14 @@ public class WherobotsJdbcDriver implements Driver {
                 throw new SQLException("Invalid WebSocket URI: " + wsUriString, e);
             }
         } else {
-            session = WherobotsSessionSupplier.create(host, runtime, region, sessionType, headers);
+            session = WherobotsSessionSupplier.create(
+                    host,
+                    runtime,
+                    region,
+                    version,
+                    sessionType,
+                    headers
+            );
         }
 
         return new WherobotsJdbcConnection(session, info);
