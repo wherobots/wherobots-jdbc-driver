@@ -18,10 +18,40 @@ dependencies {
 }
 ```
 
+```java
+DriverManager.setLogWriter(new PrintWriter(System.out));
+DriverManager.registerDriver(new WherobotsJdbcDriver());
+
+Properties props = new Properties();
+props.put(WherobotsJdbcDriver.API_KEY_PROP, apiKey);
+
+logger.info("Connecting to Wherobots SQL API with properties: {}", props);
+
+try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.cloud.wherobots.com", props)) {
+    try (Statement stmt = conn.createStatement()) {
+        stmt.execute(sql);
+    }
+}
+```
+
 ### In DataGrip
 
 TODO: add instructions for configuring a database connection with the
 Wherobots JDBC driver.
+
+## Connection parameters
+
+The following parameters are available, controlled by properties passed
+to the JDBC driver:
+
+* `apiKey`: the API key to authenticate with Wherobots Cloud;
+* `runtime`: the `Runtime` type (as a string) to instantiate;
+* `region`: the `Region` name (as a string) to spawn the SQL session
+  runtime into (defaults to `aws-us-west-2`);
+* `version`: the version of WherobotsDB to use (defaults to `latest`);
+* `sessionType`: the type of session (`single` or `multi`);
+* `forceNew`: whether to force the creation a new SQL session runtime
+  for this connection (defaults to `false`);
 
 ## Release
 

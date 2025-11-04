@@ -35,7 +35,7 @@ public abstract class WherobotsSessionSupplier {
 
     private static final Logger logger = LoggerFactory.getLogger(WherobotsSessionSupplier.class);
 
-    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?region=%s";
+    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?region=%s&force_new=%s";
     private static final String PROTOCOL_VERSION = "1.0.0";
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -55,12 +55,14 @@ public abstract class WherobotsSessionSupplier {
      * @param region
      * @param version
      * @param sessionType
+     * @param forceNew
      * @param headers
      * @return
      * @throws SQLException
      */
     public static WherobotsSession create(String host, Runtime runtime, Region region,
-            String version, SessionType sessionType, Map<String, String> headers)
+                                          String version, SessionType sessionType,
+                                          boolean forceNew, Map<String, String> headers)
         throws SQLException {
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -75,7 +77,7 @@ public abstract class WherobotsSessionSupplier {
         Retry retry = RetryRegistry.of(config).retry("session");
 
         try {
-            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, version, sessionType).get();
+            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, version, sessionType, forceNew).get();
             URI wsUri = Retry.decorateCheckedSupplier(retry, new SessionWsUriSupplier(client, headers, sessionIdUri)).get();
             return create(wsUri, headers);
         } catch (SQLException e) {
@@ -112,13 +114,14 @@ public abstract class WherobotsSessionSupplier {
                                       Runtime runtime,
                                       Region region,
                                       String version,
-                                      SessionType sessionType)
+                                      SessionType sessionType,
+                                      boolean forceNew)
             implements CheckedSupplier<URI> {
 
         @Override
         public URI get() throws IOException, InterruptedException {
-            logger.info("Requesting {} runtime using {} session type running {} in {} from {}...",
-                    runtime.name, sessionType.name, version, region.name, host);
+            logger.info("Requesting {}{} runtime using {} session type running {} in {} from {}...",
+                    forceNew ? "new " : "", runtime.name, sessionType.name, version, region.name, host);
 
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(
                     JsonUtil.serialize(new SqlSessionRequestPayload(
@@ -129,7 +132,7 @@ public abstract class WherobotsSessionSupplier {
 
             HttpRequest.Builder request = HttpRequest.newBuilder()
                     .POST(body)
-                    .uri(URI.create(String.format(SQL_SESSION_ENDPOINT, host, region.name)))
+                    .uri(URI.create(String.format(SQL_SESSION_ENDPOINT, host, region.name, forceNew)))
                     .header("Content-Type", "application/json");
             headers.forEach(request::header);
 
