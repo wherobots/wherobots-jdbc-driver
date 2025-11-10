@@ -35,6 +35,7 @@ public class SmokeTest {
         Properties props = new Properties();
         props.put(WherobotsJdbcDriver.API_KEY_PROP, args[0]);
         props.put(WherobotsJdbcDriver.SESSION_TYPE_PROP, SessionType.SINGLE.name());
+        props.put(WherobotsJdbcDriver.FORCE_NEW_PROP, "false");
 
         logger.info("Connecting to Wherobots SQL API with properties: {}", props);
 

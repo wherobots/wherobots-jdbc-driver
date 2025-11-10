@@ -1,6 +1,7 @@
 package com.wherobots.db;
 
 public enum Runtime {
+    MICRO("micro"),
     TINY("tiny"),
     SMALL("small"),
     MEDIUM("medium"),
@@ -14,6 +15,7 @@ public enum Runtime {
     XX_LARGE_HIMEM("2x-large-himem"),
     XXXX_LARGE_HIMEM("4x-large-himem"),
 
+    MICRO_A10_GPU("micro-a10-gpu"),
     TINY_A10_GPU("tiny-a10-gpu"),
     SMALL_GPU("small-a10-gpu"),
     MEDIUM_GPU("medium-a10-gpu"),

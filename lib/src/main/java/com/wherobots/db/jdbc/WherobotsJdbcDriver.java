@@ -34,6 +34,7 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String REGION_PROP = "region";
     public static final String VERSION_PROP = "version";
     public static final String SESSION_TYPE_PROP = "sessionType";
+    public static final String FORCE_NEW_PROP = "forceNew";
     public static final String WS_URI_PROP = "wsUri";
 
     // Results format; one of {@link DataFormat}
@@ -51,7 +52,8 @@ public class WherobotsJdbcDriver implements Driver {
     public static final Runtime DEFAULT_RUNTIME = Runtime.TINY;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
     public static final String DEFAULT_VERSION = "latest";
-    public static final SessionType DEFAULT_SESSION_TYPE = SessionType.SINGLE;
+    public static final SessionType DEFAULT_SESSION_TYPE = SessionType.MULTI;
+    public static final boolean DEFAULT_FORCE_NEW = false;
 
     public Map<String, String> getUserAgentHeader() {
         String javaVersion = System.getProperty("java.version");
@@ -101,6 +103,12 @@ public class WherobotsJdbcDriver implements Driver {
             sessionType = SessionType.valueOf(sessionTypeName);
         }
 
+        boolean forceNew = DEFAULT_FORCE_NEW;
+        String forceNewStr = info.getProperty(FORCE_NEW_PROP);
+        if (StringUtils.isNotBlank(forceNewStr)) {
+            forceNew = Boolean.parseBoolean(forceNewStr);
+        }
+
         Map<String, String> headers = new HashMap<>(getAuthHeaders(info));
         headers.putAll(getUserAgentHeader());
         WherobotsSession session;
@@ -120,6 +128,7 @@ public class WherobotsJdbcDriver implements Driver {
                     region,
                     version,
                     sessionType,
+                    forceNew,
                     headers
             );
         }
