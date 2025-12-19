@@ -120,8 +120,13 @@ public abstract class WherobotsSessionSupplier {
 
         @Override
         public URI get() throws IOException, InterruptedException {
-            logger.info("Requesting {}{} runtime using {} session type running {} in {} from {}...",
-                    forceNew ? "new " : "", runtime.name, sessionType.name, version, region.name, host);
+            logger.info("Requesting {}{} runtime using {} session {}in {} from {}...",
+                    forceNew ? "new " : "",
+                    runtime.name,
+                    sessionType.name,
+                    version != null ? String.format("running %s ", version) : "",
+                    region.name,
+                    host);
 
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(
                     JsonUtil.serialize(new SqlSessionRequestPayload(
