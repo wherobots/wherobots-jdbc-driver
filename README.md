@@ -48,7 +48,10 @@ to the JDBC driver:
 * `runtime`: the `Runtime` type (as a string) to instantiate;
 * `region`: the `Region` name (as a string) to spawn the SQL session
   runtime into (defaults to `aws-us-west-2`);
-* `version`: the version of WherobotsDB to use (defaults to `latest`);
+* `version`: one of the supported WherobotsDB runtime versions that
+  is available to you, if you need to pin your usage to a particular,
+  supported WherobotsDB version. Defaults to the latest, most-optimized
+  version of WherobotsDB available to your subscription;
 * `sessionType`: the type of session (`single` or `multi`);
 * `forceNew`: whether to force the creation a new SQL session runtime
   for this connection (defaults to `false`);

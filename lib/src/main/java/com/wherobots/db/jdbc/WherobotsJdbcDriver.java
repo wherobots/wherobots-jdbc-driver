@@ -51,7 +51,6 @@ public class WherobotsJdbcDriver implements Driver {
 
     public static final Runtime DEFAULT_RUNTIME = Runtime.TINY;
     public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
-    public static final String DEFAULT_VERSION = "latest";
     public static final SessionType DEFAULT_SESSION_TYPE = SessionType.MULTI;
     public static final boolean DEFAULT_FORCE_NEW = false;
 
@@ -91,7 +90,7 @@ public class WherobotsJdbcDriver implements Driver {
             region = Region.valueOf(regionName);
         }
 
-        String version = DEFAULT_VERSION;
+        String version = null;
         String givenVersion = info.getProperty(VERSION_PROP);
         if (StringUtils.isNotBlank(givenVersion)) {
             version = givenVersion;
