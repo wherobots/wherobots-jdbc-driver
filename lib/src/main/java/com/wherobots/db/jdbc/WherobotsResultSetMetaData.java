@@ -20,7 +20,9 @@ public class WherobotsResultSetMetaData implements ResultSetMetaData {
     public WherobotsResultSetMetaData(Schema schema) {
         this.schema = schema;
         this.fields = schema.getFields().stream().map(Field::getName).toArray(String[]::new);
-        logger.info("ResultSet({})", Arrays.asList(fields));
+        if (logger.isDebugEnabled()) {
+            logger.debug("ResultSet({})", Arrays.asList(fields));
+        }
     }
 
     public int getColumnIndex(String name) throws SQLException {

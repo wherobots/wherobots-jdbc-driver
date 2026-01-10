@@ -55,13 +55,13 @@ public class WherobotsSession extends WebSocketClient implements Iterable<Frame>
 
     @Override
     public void onMessage(String s) {
-        logger.info("< {}", s);
+        logger.debug("< {}", s);
         this.forward(new Frame(s, null, null));
     }
 
     @Override
     public void onMessage(ByteBuffer bytes) {
-        logger.info("< {}", bytes);
+        logger.debug("< {} bytes", bytes.remaining());
         this.forward(new Frame(null, bytes, null));
     }
 
@@ -78,7 +78,7 @@ public class WherobotsSession extends WebSocketClient implements Iterable<Frame>
 
     @Override
     public void send(String text) {
-        logger.info("> {}", text);
+        logger.debug("> {}", text);
         super.send(text);
     }
 

@@ -79,7 +79,9 @@ public class WherobotsJdbcConnection implements Connection {
     }
 
     private void handle(Event event) throws Exception {
-        logger.info("Handling event: {}", JsonUtil.serialize(event));
+        if (logger.isDebugEnabled()) {
+            logger.debug("Handling event: {}", JsonUtil.serialize(event));
+        }
         if (event.kind == null || event.executionId == null) {
             // Invalid event.
             return;
