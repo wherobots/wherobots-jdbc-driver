@@ -1,81 +1,156 @@
-# Wherobots Spatial SQL JDBC Driver
+# Wherobots JDBC Driver
 
-This library provides a JDBC driver implementation for the Wherobots
-Spatial SQL API. It allows you to build Java/Scala/Kotlin applications
-that can interact with Wherobots and leverage the Spatial SQL and
-geospatial analytics capabilities of WherobotsDB.
+[![Maven Central](https://img.shields.io/maven-central/v/com.wherobots.jdbc/wherobots-jdbc-driver.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/com.wherobots.jdbc/wherobots-jdbc-driver)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://openjdk.org/)
 
-This JDBC driver is also directly usable from database applications like
-JetBrains's DataGrip or DBeaver.
+A JDBC driver for [Wherobots Spatial SQL](https://www.wherobots.com), enabling
+Java, Scala, and Kotlin applications to interact with WherobotsDB and leverage
+its powerful geospatial analytics capabilities.
 
-## Usage
+This driver is also compatible with database tools like [JetBrains
+DataGrip](https://www.jetbrains.com/datagrip/) and
+[DBeaver](https://dbeaver.io/).
 
-### As a library
+## Installation
+
+### Gradle
 
 ```gradle
 dependencies {
-  implementation 'com.wherobots.jdbc:wherobots-jdbc-driver:0.1.0'
+    implementation 'com.wherobots.jdbc:wherobots-jdbc-driver:0.1.6'
 }
 ```
 
+### Maven
+
+```xml
+<dependency>
+    <groupId>com.wherobots.jdbc</groupId>
+    <artifactId>wherobots-jdbc-driver</artifactId>
+    <version>0.1.6</version>
+</dependency>
+```
+
+## Quick Start
+
 ```java
-DriverManager.setLogWriter(new PrintWriter(System.out));
-DriverManager.registerDriver(new WherobotsJdbcDriver());
+import com.wherobots.db.jdbc.WherobotsJdbcDriver;
+import java.sql.*;
+import java.util.Properties;
 
-Properties props = new Properties();
-props.put(WherobotsJdbcDriver.API_KEY_PROP, apiKey);
+public class Example {
+    public static void main(String[] args) throws SQLException {
+        // Register the driver
+        DriverManager.registerDriver(new WherobotsJdbcDriver());
 
-logger.info("Connecting to Wherobots SQL API with properties: {}", props);
+        // Configure connection properties
+        Properties props = new Properties();
+        props.put("apiKey", System.getenv("WHEROBOTS_API_KEY"));
+        props.put("runtime", "SMALL");
+        props.put("region", "AWS_US_WEST_2");
 
-try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.cloud.wherobots.com", props)) {
-    try (Statement stmt = conn.createStatement()) {
-        stmt.execute(sql);
+        // Connect and execute a query
+        String url = "jdbc:wherobots://api.cloud.wherobots.com";
+        try (Connection conn = DriverManager.getConnection(url, props);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 "SELECT id, ST_AsText(geometry) as geom FROM wherobots_open_data.overture.admins LIMIT 10")) {
+            while (rs.next()) {
+                System.out.printf("%s: %s%n", rs.getString("id"), rs.getString("geom"));
+            }
+        }
     }
 }
 ```
 
-### In DataGrip
+## Connection Parameters
 
-TODO: add instructions for configuring a database connection with the
-Wherobots JDBC driver.
+Configure the driver using properties passed to `DriverManager.getConnection()`:
 
-## Connection parameters
+### Authentication
 
-The following parameters are available, controlled by properties passed
-to the JDBC driver:
+| Property | Description |
+|----------|-------------|
+| `apiKey` | Your Wherobots Cloud API key |
+| `token`  | Alternative: a bearer token for authentication |
 
-* `apiKey`: the API key to authenticate with Wherobots Cloud;
-* `runtime`: the `Runtime` type (as a string) to instantiate;
-* `region`: the `Region` name (as a string) to spawn the SQL session
-  runtime into (defaults to `aws-us-west-2`);
-* `version`: one of the supported WherobotsDB runtime versions that
-  is available to you, if you need to pin your usage to a particular,
-  supported WherobotsDB version. Defaults to the latest, most-optimized
-  version of WherobotsDB available to your subscription;
-* `sessionType`: the type of session (`single` or `multi`);
-* `forceNew`: whether to force the creation a new SQL session runtime
-  for this connection (defaults to `false`);
+### Session Configuration
 
-## Release
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `runtime` | `Runtime` | `TINY` | The runtime size to use (see [Runtimes](#runtimes)) |
+| `region` | `Region` | `AWS_US_WEST_2` | The cloud region to run in (see [Regions](#regions)) |
+| `version` | `String` | _(latest)_ | Pin to a specific WherobotsDB runtime version |
+| `sessionType` | `SessionType` | `MULTI` | `SINGLE` or `MULTI` concurrent connections |
+| `forceNew` | `boolean` | `false` | Force creation of a new session instead of reusing an existing one |
+| `wsUri` | `String` | _(none)_ | Connect directly to a WebSocket URI (advanced) |
 
-To publish a new release, you need an account on [Sonatype's Central
-Portal](https://central.sonatype.com) with permissions to publish into
-the `com.wherobots` namespace. From your account, create an API key,
-which gets you a user token and secret key pair:
+### Result Options
 
-```sh
-export OSSRH_USERNAME=<user token>
-export OSSRH_PASSWORD=<secret key>
-```
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `format` | `DataFormat` | `arrow` | Result format: `arrow` or `json` |
+| `compression` | `DataCompression` | `zstd` | Compression: `none`, `lz4`, or `zstd` |
+| `geometry` | `GeometryRepresentation` | _(none)_ | Geometry output: `wkt`, `wkb`, `ewkt`, `ewkb`, or `geojson` |
 
-You also need a GnuPG key, loaded up in `gpg-agent`, for signing the
-release artifacts.
+<details>
+<summary><h3>Runtimes</h3></summary>
 
-Then, after setting the new version in `lib/build.gradle`, publish with:
+The `runtime` property accepts the following values:
 
-```sh
-$ ./gradlew clean publishToCentralPortal
-```
+| Runtime | Description |
+|---------|-------------|
+| `MICRO` | Micro instance |
+| `TINY` | Tiny instance (default) |
+| `SMALL` | Small instance |
+| `MEDIUM` | Medium instance |
+| `LARGE` | Large instance |
+| `X_LARGE` | Extra-large instance |
+| `XX_LARGE` | 2x-large instance |
+| `MEDIUM_HIMEM` | Medium high-memory instance |
+| `LARGE_HIMEM` | Large high-memory instance |
+| `X_LARGE_HIMEM` | Extra-large high-memory instance |
+| `XX_LARGE_HIMEM` | 2x-large high-memory instance |
+| `XXXX_LARGE_HIMEM` | 4x-large high-memory instance |
+| `MICRO_A10_GPU` | Micro GPU instance |
+| `TINY_A10_GPU` | Tiny GPU instance |
+| `SMALL_GPU` | Small GPU instance |
+| `MEDIUM_GPU` | Medium GPU instance |
 
-You can then check the status and validation of thsi deployment at
-https://central.sonatype.com/publishing/deployments
+</details>
+
+<details>
+<summary><h3>Regions</h3></summary>
+
+The `region` property accepts the following values:
+
+| Region | Location |
+|--------|----------|
+| `AWS_US_WEST_2` | US West (Oregon) - default |
+| `AWS_US_EAST_1` | US East (N. Virginia) |
+| `AWS_EU_WEST_1` | EU (Ireland) |
+| `AWS_AP_SOUTH_1` | Asia Pacific (Mumbai) |
+
+</details>
+
+## Using with DataGrip
+
+1. Download the latest driver JAR from [Maven
+   Central](https://central.sonatype.com/artifact/com.wherobots.jdbc/wherobots-jdbc-driver)
+2. In DataGrip, go to **Database** → **New** → **Driver**
+3. Add the downloaded JAR file
+4. Set the driver class to `com.wherobots.db.jdbc.WherobotsJdbcDriver`
+5. Create a new connection using this driver with URL
+   `jdbc:wherobots://api.cloud.wherobots.com`
+6. Add your `apiKey` in the connection properties
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and release
+instructions.
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the
+[LICENSE](LICENSE) file for details.
