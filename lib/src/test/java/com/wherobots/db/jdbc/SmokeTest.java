@@ -7,6 +7,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Properties;
 
+import com.wherobots.db.jdbc.models.Store;
+import com.wherobots.db.jdbc.models.StoreResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,14 +23,13 @@ public class SmokeTest {
 
         String sql = """
             SELECT
-                id,
-                names['primary'] AS name,
-                geometry,
-                population
+              latitude,
+              longitude
             FROM
-                wherobots_open_data.overture_2024_02_15.admins_locality
-            WHERE localityType = 'country'
-            SORT BY population DESC
+              wherobots_open_data.foursquare.places
+            WHERE
+              country = 'US'
+              AND LOWER(name) = 'starbucks'
             LIMIT 10
         """;
 
@@ -39,30 +40,32 @@ public class SmokeTest {
 
         logger.info("Connecting to Wherobots SQL API with properties: {}", props);
 
-        try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.staging.wherobots.com", props)) {
+        try (Connection conn = DriverManager.getConnection("jdbc:wherobots://api.cloud.wherobots.com", props)) {
             try (Statement stmt = conn.createStatement()) {
-                new Thread(() -> {
-                    try {
-                        System.out.println("Cancelling query in 2s!");
-                        Thread.sleep(2000L);
-                        stmt.cancel();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }).start();
+                // Configure store to get a presigned URL for download
+                WherobotsStatement wstmt = stmt.unwrap(WherobotsStatement.class);
+                wstmt.setStore(Store.forDownload());
 
                 boolean hasResult = stmt.execute(sql);
+
+                // Print store result if available
+                StoreResult storeResult = wstmt.getStoreResult();
+                if (storeResult != null) {
+                    logger.info("Results stored at: {} (size: {} bytes)", storeResult.resultUri(), storeResult.size());
+                }
+
                 if (!hasResult) {
                     return;
                 }
 
                 try (ResultSet result = stmt.getResultSet()) {
+                    int i = 0;
                     while (result.next()) {
-                        System.out.printf("%s: %s\t%s\t%12d%n",
-                                result.getString("id"),
-                                result.getString("name"),
-                                result.getString("geometry"),
-                                result.getInt("population")
+                        i++;
+                        System.out.printf("%4d: %.5f\t%.5f%n",
+                                i,
+                                result.getDouble("latitude"),
+                                result.getDouble("longitude")
                         );
                     }
                 }
