@@ -18,7 +18,7 @@ DataGrip](https://www.jetbrains.com/datagrip/) and
 
 ```gradle
 dependencies {
-    implementation 'com.wherobots.jdbc:wherobots-jdbc-driver:0.1.6'
+    implementation 'com.wherobots.jdbc:wherobots-jdbc-driver:0.2.0'
 }
 ```
 
@@ -28,7 +28,7 @@ dependencies {
 <dependency>
     <groupId>com.wherobots.jdbc</groupId>
     <artifactId>wherobots-jdbc-driver</artifactId>
-    <version>0.1.6</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
