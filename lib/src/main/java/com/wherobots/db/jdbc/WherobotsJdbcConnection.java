@@ -11,6 +11,8 @@ import com.wherobots.db.jdbc.models.Event;
 import com.wherobots.db.jdbc.models.ExecuteSqlRequest;
 import com.wherobots.db.jdbc.models.QueryState;
 import com.wherobots.db.jdbc.models.RetrieveResultsRequest;
+import com.wherobots.db.jdbc.models.Store;
+import com.wherobots.db.jdbc.models.StoreResult;
 import com.wherobots.db.jdbc.serde.ArrowUtil;
 import com.wherobots.db.jdbc.serde.JsonUtil;
 import com.wherobots.db.jdbc.session.WherobotsSession;
@@ -80,7 +82,7 @@ public class WherobotsJdbcConnection implements Connection {
 
     private void handle(Event event) throws Exception {
         if (logger.isDebugEnabled()) {
-            logger.debug("Handling event: {}", JsonUtil.serialize(event));
+            logger.info("Handling event: {}", JsonUtil.serialize(event));
         }
         if (event.kind == null || event.executionId == null) {
             // Invalid event.
@@ -93,13 +95,23 @@ public class WherobotsJdbcConnection implements Connection {
             return;
         }
 
-        if (event instanceof Event.StateUpdatedEvent) {
+        if (event instanceof Event.StateUpdatedEvent sue) {
             query.setStatus(event.state);
             logger.info("Query {} is now {}.", event.executionId, event.state);
 
             switch (event.state) {
-                case succeeded -> this.retrieveResults(event.executionId);
-                case cancelled -> query.statement().onExecutionResult(new ExecutionResult(null, null));
+                case succeeded -> {
+                    if (sue.resultUri != null) {
+                        // Results are stored in cloud storage, push directly to queue with store result
+                        StoreResult storeResult = new StoreResult(sue.resultUri, sue.size);
+                        logger.info("Query {} stored result at: {} (size: {})", event.executionId, sue.resultUri, sue.size);
+                        query.statement().onExecutionResult(new ExecutionResult(null, null, storeResult));
+                    } else {
+                        // No store configured, retrieve results normally
+                        this.retrieveResults(event.executionId);
+                    }
+                }
+                case cancelled -> query.statement().onExecutionResult(new ExecutionResult(null, null, null));
                 case failed -> {
                     // No-op, error event will follow.
                 }
@@ -115,20 +127,20 @@ public class WherobotsJdbcConnection implements Connection {
                         "Received {} bytes of {}-compressed {} results from {}.",
                         results.resultBytes.length, results.compression, results.format, event.executionId);
                 ArrowStreamReader reader = ArrowUtil.readFrom(results.resultBytes, results.compression);
-                query.statement().onExecutionResult(new ExecutionResult(reader, null));
+                query.statement().onExecutionResult(new ExecutionResult(reader, null, null));
             }
             return;
         }
 
         if (event instanceof Event.ErrorEvent error) {
-            query.statement().onExecutionResult(new ExecutionResult(null, new SQLException(error.message)));
+            query.statement().onExecutionResult(new ExecutionResult(null, new SQLException(error.message), null));
             return;
         }
 
         logger.warn("Received unknown event kind: {}", event.kind);
     }
 
-    String execute(String sql, WherobotsStatement statement) {
+    String execute(String sql, WherobotsStatement statement, Store store) {
         String executionId = UUID.randomUUID().toString();
         this.queries.put(executionId, new Query(
                 executionId,
@@ -138,7 +150,8 @@ public class WherobotsJdbcConnection implements Connection {
 
         String request = JsonUtil.serialize(new ExecuteSqlRequest(
                 executionId,
-                sql
+                sql,
+                store
         ));
 
         logger.info("Executing SQL query {}: {}", executionId, request);

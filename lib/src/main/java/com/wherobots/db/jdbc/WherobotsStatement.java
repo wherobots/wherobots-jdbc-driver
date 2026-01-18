@@ -1,6 +1,8 @@
 package com.wherobots.db.jdbc;
 
 import com.wherobots.db.jdbc.internal.ExecutionResult;
+import com.wherobots.db.jdbc.models.Store;
+import com.wherobots.db.jdbc.models.StoreResult;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -31,6 +33,10 @@ public class WherobotsStatement implements Statement {
     private boolean closeOnCompletion = false;
     private boolean closed = false;
 
+    // Store configuration and result
+    private Store store;
+    private StoreResult storeResult;
+
     public WherobotsStatement(WherobotsJdbcConnection connection) {
         this.connection = connection;
         this.queue = new ArrayBlockingQueue<>(1);
@@ -39,6 +45,48 @@ public class WherobotsStatement implements Statement {
     void onExecutionResult(ExecutionResult result) throws InterruptedException {
         this.queue.put(result);
     }
+
+    // ==================== Store Configuration (Wherobots extension) ====================
+
+    /**
+     * Set the store configuration for this statement.
+     * <p>
+     * When configured, query results will be stored to cloud storage and the
+     * result URI can be retrieved via {@link #getStoreResult()} after execution.
+     * <p>
+     * This is a Wherobots-specific extension. Access via {@code statement.unwrap(WherobotsStatement.class)}.
+     *
+     * @param store the store configuration
+     */
+    public void setStore(Store store) {
+        this.store = store;
+    }
+
+    /**
+     * Get the store configuration for this statement.
+     *
+     * @return the store configuration, or null if not configured
+     */
+    public Store getStore() {
+        return this.store;
+    }
+
+    /**
+     * Get the result of storing query results to cloud storage.
+     * <p>
+     * This method returns the URI (or presigned URL) and size of the stored result
+     * after a query has been executed with store configuration.
+     * <p>
+     * This is a Wherobots-specific extension. Access via {@code statement.unwrap(WherobotsStatement.class)}.
+     *
+     * @return the store result containing the URI and size, or null if the query
+     *         was not configured to store results or has not been executed yet
+     */
+    public StoreResult getStoreResult() {
+        return this.storeResult;
+    }
+
+    // ==================== JDBC Statement Implementation ====================
 
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
@@ -138,7 +186,7 @@ public class WherobotsStatement implements Statement {
             throw new IllegalStateException("This statement has already been executed");
         }
 
-        this.executionId = this.connection.execute(sql, this);
+        this.executionId = this.connection.execute(sql, this, this.store);
 
         try {
             ExecutionResult result = this.queue.poll(this.timeoutSeconds, TimeUnit.SECONDS);
@@ -150,6 +198,9 @@ public class WherobotsStatement implements Statement {
             if (result.error() != null) {
                 throw new SQLException(result.error());
             }
+
+            // Capture store result if present
+            this.storeResult = result.storeResult();
 
             if (result.result() == null) {
                 return false;
@@ -309,12 +360,16 @@ public class WherobotsStatement implements Statement {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T> T unwrap(Class<T> iface) throws SQLException {
-        return null;
+        if (isWrapperFor(iface)) {
+            return (T) this;
+        }
+        throw new SQLException("Cannot unwrap to " + iface.getName());
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        return false;
+        return iface != null && iface.isAssignableFrom(getClass());
     }
 }

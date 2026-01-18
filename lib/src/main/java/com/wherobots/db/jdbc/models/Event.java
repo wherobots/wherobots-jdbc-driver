@@ -27,7 +27,11 @@ public class Event {
     public String executionId;
     public QueryState state;
 
-    public static class StateUpdatedEvent extends Event {}
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public static class StateUpdatedEvent extends Event {
+        public String resultUri;
+        public Long size;
+    }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class ErrorEvent extends Event {

@@ -145,6 +145,49 @@ The `region` property accepts the following values:
    `jdbc:wherobots://api.cloud.wherobots.com`
 6. Add your `apiKey` in the connection properties
 
+## Storing Results to Cloud Storage
+
+The driver supports storing query results directly to cloud storage and
+returning a presigned URL for download. This is useful for large result sets
+that you want to process outside of JDBC.
+
+This feature is exposed as a Wherobots-specific extension, accessible via
+`unwrap()`:
+
+```java
+import com.wherobots.db.StorageFormat;
+import com.wherobots.db.jdbc.WherobotsStatement;
+import com.wherobots.db.jdbc.models.Store;
+import com.wherobots.db.jdbc.models.StoreResult;
+
+try (Statement stmt = conn.createStatement()) {
+    // Unwrap to access Wherobots-specific features
+    WherobotsStatement wstmt = stmt.unwrap(WherobotsStatement.class);
+
+    // Configure to store results and get a presigned URL
+    wstmt.setStore(Store.forDownload());
+
+    // Execute the query
+    wstmt.execute("SELECT * FROM my_table");
+
+    // Get the presigned URL and file size
+    StoreResult result = wstmt.getStoreResult();
+    System.out.println("Download URL: " + result.resultUri());
+    System.out.println("File size: " + result.size() + " bytes");
+}
+```
+
+### Store Options
+
+The `Store` class provides factory methods for creating store configurations:
+
+| Factory Method | Description |
+|----------------|-------------|
+| `Store.forDownload()` | Single parquet file with presigned URL (most common) |
+| `Store.forDownload(format)` | Single file with presigned URL in specified format |
+
+The `StorageFormat` enum supports: `parquet`, `csv`, and `geojson`.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and release
