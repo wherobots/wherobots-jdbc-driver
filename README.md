@@ -185,8 +185,22 @@ The `Store` class provides factory methods for creating store configurations:
 |----------------|-------------|
 | `Store.forDownload()` | Single parquet file with presigned URL (most common) |
 | `Store.forDownload(format)` | Single file with presigned URL in specified format |
+| `Store.forDownload(format, options)` | Single file with presigned URL, format, and additional options |
 
 The `StorageFormat` enum supports: `parquet`, `csv`, and `geojson`.
+
+You can pass format-specific storage options as a `Map<String, String>`.
+These correspond to the options available in Spark's `OPTIONS (...)` clause:
+
+```java
+import java.util.Map;
+
+// GeoJSON with null field handling
+wstmt.setStore(Store.forDownload(StorageFormat.geojson, Map.of("ignoreNullFields", "false")));
+
+// CSV with header and custom delimiter
+wstmt.setStore(Store.forDownload(StorageFormat.csv, Map.of("header", "true", "delimiter", ",")));
+```
 
 ## Contributing
 
