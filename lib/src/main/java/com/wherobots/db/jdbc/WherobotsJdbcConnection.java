@@ -106,6 +106,10 @@ public class WherobotsJdbcConnection implements Connection {
                         StoreResult storeResult = new StoreResult(sue.resultUri, sue.size);
                         logger.info("Query {} stored result at: {} (size: {})", event.executionId, sue.resultUri, sue.size);
                         query.statement().onExecutionResult(new ExecutionResult(null, null, storeResult));
+                    } else if (query.statement().getStore() != null) {
+                        // Store was configured but produced no results (empty result set)
+                        logger.info("Query {} completed with store configured but no results to store.", event.executionId);
+                        query.statement().onExecutionResult(new ExecutionResult(null, null, null));
                     } else {
                         // No store configured, retrieve results normally
                         this.retrieveResults(event.executionId);
@@ -128,6 +132,11 @@ public class WherobotsJdbcConnection implements Connection {
                         results.resultBytes.length, results.compression, results.format, event.executionId);
                 ArrowStreamReader reader = ArrowUtil.readFrom(results.resultBytes, results.compression);
                 query.statement().onExecutionResult(new ExecutionResult(reader, null, null));
+            } else {
+                // Server returned no result data — unblock the statement.
+                // This can happen for store-only executions or empty results.
+                logger.warn("Received execution_result with no result data for query {}.", event.executionId);
+                query.statement().onExecutionResult(new ExecutionResult(null, null, null));
             }
             return;
         }
