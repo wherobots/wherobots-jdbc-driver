@@ -92,6 +92,9 @@ signing {
 
 test {
     useJUnitPlatform()
+    jvmArgs += ["--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED"]
+    environment "WHEROBOTS_API_KEY", System.getenv("WHEROBOTS_API_KEY")
+    environment "WHEROBOTS_HOST", System.getenv("WHEROBOTS_HOST")
 }
 
 // Run this task with `./gradlew runSmokeTest -Papikey=<your_api_key>`
