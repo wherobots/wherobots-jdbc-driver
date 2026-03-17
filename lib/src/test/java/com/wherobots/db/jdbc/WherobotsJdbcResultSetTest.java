@@ -10,6 +10,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -79,7 +81,42 @@ class WherobotsJdbcResultSetTest {
         }
     }
 
+    @Test
+    void getNestedTypes() throws Exception {
+        String sql = """
+            SELECT
+              array(1, 2, 3)                          AS array_col,
+              map('a', 1, 'b', 2)                     AS map_col,
+              named_struct('x', 10, 'y', 'hello')     AS struct_col
+            """;
 
+        try (Statement stmt = connection.createStatement()) {
+            assertTrue(stmt.execute(sql));
+
+            try (ResultSet rs = stmt.getResultSet()) {
+                assertTrue(rs.next(), "expected one row");
+
+                // Array
+                Object arrayVal = rs.getObject("array_col");
+                assertInstanceOf(List.class, arrayVal);
+                assertEquals(List.of(1, 2, 3), arrayVal);
+
+                // Map
+                Object mapVal = rs.getObject("map_col");
+                assertInstanceOf(Map.class, mapVal);
+                assertEquals(Map.of("a", 1, "b", 2), mapVal);
+
+                // Struct
+                Object structVal = rs.getObject("struct_col");
+                assertNotNull(structVal);
+                String structStr = structVal.toString();
+                assertTrue(structStr.contains("10"), "struct should contain field value 10");
+                assertTrue(structStr.contains("hello"), "struct should contain field value 'hello'");
+
+                assertFalse(rs.next(), "expected only one row");
+            }
+        }
+    }
 
     @Test
     void queryFoursquarePlaces() throws Exception {
