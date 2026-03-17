@@ -40,6 +40,48 @@ class WherobotsJdbcResultSetTest {
     }
 
     @Test
+    void getDataTypesNonNested() throws Exception {
+        String sql = """
+            SELECT
+              CAST('hello' AS STRING)           AS str_col,
+              CAST(TRUE AS BOOLEAN)             AS bool_col,
+              CAST(42 AS TINYINT)               AS byte_col,
+              CAST(1234 AS SMALLINT)            AS short_col,
+              CAST(100000 AS INT)               AS int_col,
+              CAST(9999999999 AS BIGINT)         AS long_col,
+              CAST(3.14 AS FLOAT)               AS float_col,
+              CAST(2.718281828 AS DOUBLE)        AS double_col,
+              CAST(X'DEADBEEF' AS BINARY)        AS bytes_col,
+              CAST('2025-06-15' AS DATE)         AS date_col,
+              CAST('2025-06-15T10:30:00' AS TIMESTAMP) AS timestamp_col
+            """;
+
+        try (Statement stmt = connection.createStatement()) {
+            assertTrue(stmt.execute(sql));
+
+            try (ResultSet rs = stmt.getResultSet()) {
+                assertTrue(rs.next(), "expected one row");
+
+                assertEquals("hello", rs.getString("str_col"));
+                assertTrue(rs.getBoolean("bool_col"));
+                assertEquals((byte) 42, rs.getByte("byte_col"));
+                assertEquals((short) 1234, rs.getShort("short_col"));
+                assertEquals(100000, rs.getInt("int_col"));
+                assertEquals(9999999999L, rs.getLong("long_col"));
+                assertEquals(3.14f, rs.getFloat("float_col"), 0.01f);
+                assertEquals(2.718281828, rs.getDouble("double_col"), 0.000001);
+                assertArrayEquals(new byte[]{(byte)0xDE,(byte)0xAD,(byte)0xBE,(byte)0xEF}, rs.getBytes("bytes_col"));
+                assertEquals(java.sql.Date.valueOf("2025-06-15"), rs.getDate("date_col"));
+                assertEquals(java.sql.Timestamp.valueOf("2025-06-15 10:30:00"), rs.getTimestamp("timestamp_col"));
+
+                assertFalse(rs.next(), "expected only one row");
+            }
+        }
+    }
+
+
+
+    @Test
     void queryFoursquarePlaces() throws Exception {
         String sql = """
             SELECT
