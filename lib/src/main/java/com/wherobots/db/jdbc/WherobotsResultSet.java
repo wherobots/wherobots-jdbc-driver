@@ -3,6 +3,8 @@ package com.wherobots.db.jdbc;
 import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.types.DateUnit;
+import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.util.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +34,8 @@ import java.sql.SQLXML;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.Map;
 
@@ -193,8 +197,17 @@ public class WherobotsResultSet implements ResultSet {
             return cls.cast(value);
         } catch (Exception e) {
             throw new SQLException(
-                    String.format("Error accessing column %s from current row %d of resultset", columnLabel, currentRow),
+                    String.format("Error accessing column %s from current row %d of resultset", columnLabel,
+                            currentRow),
                     e);
+        }
+    }
+
+    private ArrowType getArrowType(String columnLabel) throws SQLException {
+        try {
+            return root.getSchema().findField(columnLabel).getType();
+        } catch (Exception e) {
+            throw new SQLException(String.format("Error accessing type for column %s", columnLabel), e);
         }
     }
 
@@ -250,7 +263,23 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public Date getDate(String columnLabel) throws SQLException {
-        return get(columnLabel, Date.class);
+        ArrowType arrowType = getArrowType(columnLabel);
+        switch (arrowType.getTypeID()) {
+            case Date:
+                // In very rare circumstances this could be a Date64 (milliseconds)
+                ArrowType.Date dateType = (ArrowType.Date) arrowType;
+                if (dateType.getUnit() == DateUnit.DAY) {
+                    int daysSinceEpoch = get(columnLabel, Integer.class);
+                    return Date.valueOf(LocalDate.ofEpochDay(daysSinceEpoch));
+                }
+                break;
+            default:
+                break;
+
+        }
+
+        throw new SQLException(
+                String.format("Can't get field '%s' as Date (storage type: %s)", columnLabel, arrowType));
     }
 
     @Override
@@ -260,7 +289,30 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public Timestamp getTimestamp(String columnLabel) throws SQLException {
-        return get(columnLabel, Timestamp.class);
+        ArrowType arrowType = getArrowType(columnLabel);
+        switch (arrowType.getTypeID()) {
+            case Timestamp:
+                ArrowType.Timestamp timestampType = (ArrowType.Timestamp) arrowType;
+                long sinceEpoch = get(columnLabel, Long.class);
+                switch (timestampType.getUnit()) {
+                    case MICROSECOND:
+                        return Timestamp.from(Instant.ofEpochSecond(
+                                sinceEpoch / 1_000_000, (sinceEpoch % 1_000_000) * 1_000));
+                    case MILLISECOND:
+                        return Timestamp.from(Instant.ofEpochMilli(sinceEpoch));
+                    case NANOSECOND:
+                        return Timestamp.from(Instant.ofEpochSecond(
+                                sinceEpoch / 1_000_000_000, sinceEpoch % 1_000_000_000));
+                    case SECOND:
+                        return Timestamp.from(Instant.ofEpochSecond(sinceEpoch));
+                }
+            default:
+                break;
+
+        }
+
+        throw new SQLException(
+                String.format("Can't get field '%s' as Timestamp (storage type: %s)", columnLabel, arrowType));
     }
 
     @Override

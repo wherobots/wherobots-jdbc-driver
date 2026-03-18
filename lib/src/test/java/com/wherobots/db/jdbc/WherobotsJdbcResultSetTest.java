@@ -10,6 +10,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -44,19 +46,19 @@ class WherobotsJdbcResultSetTest {
     @Test
     void getDataTypesNonNested() throws Exception {
         String sql = """
-            SELECT
-              CAST('hello' AS STRING)           AS str_col,
-              CAST(TRUE AS BOOLEAN)             AS bool_col,
-              CAST(42 AS TINYINT)               AS byte_col,
-              CAST(1234 AS SMALLINT)            AS short_col,
-              CAST(100000 AS INT)               AS int_col,
-              CAST(9999999999 AS BIGINT)         AS long_col,
-              CAST(3.14 AS FLOAT)               AS float_col,
-              CAST(2.718281828 AS DOUBLE)        AS double_col,
-              CAST(X'DEADBEEF' AS BINARY)        AS bytes_col,
-              CAST('2025-06-15' AS DATE)         AS date_col,
-              CAST('2025-06-15T10:30:00' AS TIMESTAMP) AS timestamp_col
-            """;
+                SELECT
+                  CAST('hello' AS STRING)           AS str_col,
+                  CAST(TRUE AS BOOLEAN)             AS bool_col,
+                  CAST(42 AS TINYINT)               AS byte_col,
+                  CAST(1234 AS SMALLINT)            AS short_col,
+                  CAST(100000 AS INT)               AS int_col,
+                  CAST(9999999999 AS BIGINT)         AS long_col,
+                  CAST(3.14 AS FLOAT)               AS float_col,
+                  CAST(2.718281828 AS DOUBLE)        AS double_col,
+                  CAST(X'DEADBEEF' AS BINARY)        AS bytes_col,
+                  CAST('2025-06-15' AS DATE)         AS date_col,
+                  CAST('2025-06-15T10:30:00' AS TIMESTAMP) AS timestamp_col
+                """;
 
         try (Statement stmt = connection.createStatement()) {
             assertTrue(stmt.execute(sql));
@@ -72,9 +74,12 @@ class WherobotsJdbcResultSetTest {
                 assertEquals(9999999999L, rs.getLong("long_col"));
                 assertEquals(3.14f, rs.getFloat("float_col"), 0.01f);
                 assertEquals(2.718281828, rs.getDouble("double_col"), 0.000001);
-                assertArrayEquals(new byte[]{(byte)0xDE,(byte)0xAD,(byte)0xBE,(byte)0xEF}, rs.getBytes("bytes_col"));
+                assertArrayEquals(new byte[] { (byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF },
+                        rs.getBytes("bytes_col"));
                 assertEquals(java.sql.Date.valueOf("2025-06-15"), rs.getDate("date_col"));
-                assertEquals(java.sql.Timestamp.valueOf("2025-06-15 10:30:00"), rs.getTimestamp("timestamp_col"));
+                assertEquals(
+                        Timestamp.from(Instant.parse("2025-06-15T10:30:00Z")),
+                        rs.getTimestamp("timestamp_col"));
 
                 assertFalse(rs.next(), "expected only one row");
             }
@@ -84,11 +89,11 @@ class WherobotsJdbcResultSetTest {
     @Test
     void getNestedTypes() throws Exception {
         String sql = """
-            SELECT
-              array(1, 2, 3)                          AS array_col,
-              map('a', 1, 'b', 2)                     AS map_col,
-              named_struct('x', 10, 'y', 'hello')     AS struct_col
-            """;
+                SELECT
+                  array(1, 2, 3)                          AS array_col,
+                  map('a', 1, 'b', 2)                     AS map_col,
+                  named_struct('x', 10, 'y', 'hello')     AS struct_col
+                """;
 
         try (Statement stmt = connection.createStatement()) {
             assertTrue(stmt.execute(sql));
@@ -121,16 +126,16 @@ class WherobotsJdbcResultSetTest {
     @Test
     void queryFoursquarePlaces() throws Exception {
         String sql = """
-            SELECT
-              latitude,
-              longitude
-            FROM
-              wherobots_open_data.foursquare.places
-            WHERE
-              country = 'US'
-              AND LOWER(name) = 'starbucks'
-            LIMIT 10
-            """;
+                SELECT
+                  latitude,
+                  longitude
+                FROM
+                  wherobots_open_data.foursquare.places
+                WHERE
+                  country = 'US'
+                  AND LOWER(name) = 'starbucks'
+                LIMIT 10
+                """;
 
         try (Statement stmt = connection.createStatement()) {
             assertTrue(stmt.execute(sql));
