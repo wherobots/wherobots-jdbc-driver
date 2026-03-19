@@ -139,6 +139,7 @@ public class WherobotsResultSet implements ResultSet {
                         long msSinceEpoch = Long.class.cast(storage);
                         return new Date(msSinceEpoch);
                 }
+                break;
 
             case Timestamp:
                 ArrowType.Timestamp timestampType = (ArrowType.Timestamp) arrowType;
