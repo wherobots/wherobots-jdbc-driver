@@ -144,7 +144,8 @@ class WherobotsJdbcResultSetTest {
                 Object structVal = rs.getObject("struct_col");
                 assertNotNull(structVal);
 
-                Map<String, Object> structMap = (Map<String, Object>) structVal;
+                assertInstanceOf(Map.class, structVal);
+                Map<?, ?> structMap = (Map<?, ?>) structVal;
                 assertEquals(3, structMap.size());
                 assertEquals(10, structMap.get("x"));
                 assertEquals("hello", structMap.get("y").toString());

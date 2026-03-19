@@ -178,24 +178,26 @@ public class WherobotsResultSet implements ResultSet {
                                 "Unsupported key storage for Map (expected String, got %s)", keyField.getType()));
                 }
 
-                List<Map<String, ?>> entries = (List<Map<String, ?>>) storage;
+                List<?> entries = (List<?>) storage;
                 LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-                for (Map<String, ?> entry : entries) {
+                for (Object rawEntry : entries) {
+                    Map<?, ?> entry = (Map<?, ?>) rawEntry;
                     String k = ((Text) entry.get(keyField.getName())).toString();
                     Object v = refineStorage(entry.get(valueField.getName()), valueField);
                     map.put(k, v);
                 }
                 return map;
+
             case Struct:
                 LinkedHashMap<String, Object> refinedStructMap = new LinkedHashMap<>();
-                Map<String, ?> storageStructMap = (Map<String, ?>) storage;
+                Map<?, ?> storageStructMap = (Map<?, ?>) storage;
                 int index = 0;
-                for (Entry<String, ?> entry : storageStructMap.entrySet()) {
+                for (Map.Entry<?, ?> entry : storageStructMap.entrySet()) {
                     Field structField = arrowField.getChildren().get(index++);
-                    refinedStructMap.put(entry.getKey(), refineStorage(entry.getValue(), structField));
+                    refinedStructMap.put(entry.getKey().toString(), refineStorage(entry.getValue(), structField));
                 }
-
                 return refinedStructMap;
+
             case List:
             case LargeList:
             case FixedSizeList:
