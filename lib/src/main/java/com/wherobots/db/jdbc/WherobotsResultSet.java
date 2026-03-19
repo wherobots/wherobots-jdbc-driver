@@ -1,7 +1,5 @@
 package com.wherobots.db.jdbc;
 
-import org.apache.arrow.flatbuf.LargeUtf8;
-import org.apache.arrow.flatbuf.Utf8View;
 import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
@@ -43,7 +41,6 @@ import java.util.Calendar;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 public class WherobotsResultSet implements ResultSet {
 
@@ -108,7 +105,7 @@ public class WherobotsResultSet implements ResultSet {
             // Column index is 1-based in JDBC
             return root.getSchema().getFields().get(columnIndex - 1);
         } catch (Exception e) {
-            throw new SQLException(String.format("Error accessing field for column at index", columnIndex), e);
+            throw new SQLException(String.format("Error accessing field for column at index %d", columnIndex), e);
         }
     }
 
@@ -138,11 +135,11 @@ public class WherobotsResultSet implements ResultSet {
                     case DAY:
                         int daysSinceEpoch = Integer.class.cast(storage);
                         return Date.valueOf(LocalDate.ofEpochDay(daysSinceEpoch));
-                    default:
-                        break;
+                    case MILLISECOND:
+                        long msSinceEpoch = Long.class.cast(storage);
+                        return new Date(msSinceEpoch);
                 }
 
-                break;
             case Timestamp:
                 ArrowType.Timestamp timestampType = (ArrowType.Timestamp) arrowType;
                 long sinceEpoch = Long.class.cast(storage);
@@ -254,7 +251,7 @@ public class WherobotsResultSet implements ResultSet {
         } catch (SQLException e) {
             throw e;
         } catch (Exception e) {
-            return null;
+            throw new SQLException(e);
         }
     }
 

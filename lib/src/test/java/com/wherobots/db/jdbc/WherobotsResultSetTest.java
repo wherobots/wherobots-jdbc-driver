@@ -37,9 +37,7 @@ class WherobotsResultSetTest {
         props.put(WherobotsJdbcDriver.API_KEY_PROP, api_key);
         props.put(WherobotsJdbcDriver.SESSION_TYPE_PROP, SessionType.SINGLE.name());
         props.put(WherobotsJdbcDriver.FORCE_NEW_PROP, "false");
-        if (timeoutString != null && !timeoutString.isEmpty()) {
-            props.put(WherobotsJdbcDriver.SHUTDOWN_AFTER_INACTIVE_SECONDS_PROP, Integer.valueOf(timeoutString));
-        }
+        props.put(WherobotsJdbcDriver.SHUTDOWN_AFTER_INACTIVE_SECONDS_PROP, timeoutString);
 
         connection = DriverManager.getConnection("jdbc:wherobots://" + host, props);
     }
