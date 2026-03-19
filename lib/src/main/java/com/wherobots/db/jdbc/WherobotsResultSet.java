@@ -3,8 +3,8 @@ package com.wherobots.db.jdbc;
 import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
-import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.util.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,203 +97,56 @@ public class WherobotsResultSet implements ResultSet {
         return this.wasNull;
     }
 
-    private <T> T get(int columnIndex, Class<T> cls) throws SQLException {
+    private Field getArrowField(int columnIndex) throws SQLException {
         try {
-            Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
-
             // Column index is 1-based in JDBC
-            Object value = root.getVector(columnIndex - 1).getObject(currentVectorRow);
-            this.wasNull = value == null;
-            return cls.cast(value);
+            return root.getSchema().getFields().get(columnIndex - 1);
         } catch (Exception e) {
-            throw new SQLException(e);
+            throw new SQLException(String.format("Error accessing field for column at index", columnIndex), e);
         }
     }
 
-    @Override
-    public String getString(int columnIndex) throws SQLException {
-        return get(columnIndex, Text.class).toString();
-    }
+    private Object getObjectImpl(int columnIndex) throws SQLException {
+        Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
 
-    @Override
-    public boolean getBoolean(int columnIndex) throws SQLException {
-        return get(columnIndex, Boolean.class);
-    }
-
-    @Override
-    public byte getByte(int columnIndex) throws SQLException {
-        return get(columnIndex, Byte.class);
-    }
-
-    @Override
-    public short getShort(int columnIndex) throws SQLException {
-        return get(columnIndex, Short.class);
-    }
-
-    @Override
-    public int getInt(int columnIndex) throws SQLException {
-        return get(columnIndex, Integer.class);
-    }
-
-    @Override
-    public long getLong(int columnIndex) throws SQLException {
-        return get(columnIndex, Long.class);
-    }
-
-    @Override
-    public float getFloat(int columnIndex) throws SQLException {
-        return get(columnIndex, Float.class);
-    }
-
-    @Override
-    public double getDouble(int columnIndex) throws SQLException {
-        return get(columnIndex, Double.class);
-    }
-
-    @Override
-    public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
-        throw new SQLFeatureNotSupportedException();
-    }
-
-    @Override
-    public byte[] getBytes(int columnIndex) throws SQLException {
-        return get(columnIndex, byte[].class);
-    }
-
-    @Override
-    public Date getDate(int columnIndex) throws SQLException {
-        return get(columnIndex, Date.class);
-    }
-
-    @Override
-    public Time getTime(int columnIndex) throws SQLException {
-        return get(columnIndex, Time.class);
-    }
-
-    @Override
-    public Timestamp getTimestamp(int columnIndex) throws SQLException {
-        return get(columnIndex, Timestamp.class);
-    }
-
-    @Override
-    public InputStream getAsciiStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(get(columnIndex, Text.class).getBytes());
-    }
-
-    @Override
-    public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(get(columnIndex, Text.class).getBytes());
-    }
-
-    @Override
-    public InputStream getBinaryStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(get(columnIndex, Text.class).getBytes());
-    }
-
-    private <T> T get(String columnLabel, Class<T> cls) throws SQLException {
-        try {
-            Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
-            Object value = root.getVector(columnLabel).getObject(currentVectorRow);
-            return cls.cast(value);
-        } catch (Exception e) {
-            throw new SQLException(
-                    String.format("Error accessing column %s from current row %d of resultset", columnLabel,
-                            currentRow),
-                    e);
+        // Column index is 1-based in JDBC
+        if (columnIndex < 1 || columnIndex > root.getFieldVectors().size()) {
+            throw new SQLException(String.format("Can't get value at index %d from result set with %d columns",
+                    columnIndex, root.getFieldVectors().size()));
         }
-    }
 
-    private ArrowType getArrowType(String columnLabel) throws SQLException {
-        try {
-            return root.getSchema().findField(columnLabel).getType();
-        } catch (Exception e) {
-            throw new SQLException(String.format("Error accessing type for column %s", columnLabel), e);
-        }
-    }
+        Object storage = root.getVector(columnIndex - 1).getObject(currentVectorRow);
+        this.wasNull = storage == null;
+        Field arrowField = getArrowField(columnIndex);
+        ArrowType arrowType = arrowField.getType();
 
-    @Override
-    public String getString(String columnLabel) throws SQLException {
-        return get(columnLabel, Text.class).toString();
-    }
-
-    @Override
-    public boolean getBoolean(String columnLabel) throws SQLException {
-        return get(columnLabel, Boolean.class);
-    }
-
-    @Override
-    public byte getByte(String columnLabel) throws SQLException {
-        return get(columnLabel, Byte.class);
-    }
-
-    @Override
-    public short getShort(String columnLabel) throws SQLException {
-        return get(columnLabel, Short.class);
-    }
-
-    @Override
-    public int getInt(String columnLabel) throws SQLException {
-        return get(columnLabel, Integer.class);
-    }
-
-    @Override
-    public long getLong(String columnLabel) throws SQLException {
-        return get(columnLabel, Long.class);
-    }
-
-    @Override
-    public float getFloat(String columnLabel) throws SQLException {
-        return get(columnLabel, Float.class);
-    }
-
-    @Override
-    public double getDouble(String columnLabel) throws SQLException {
-        return get(columnLabel, Double.class);
-    }
-
-    @Override
-    public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-        throw new SQLFeatureNotSupportedException("BigDecimal isn't supported");
-    }
-
-    @Override
-    public byte[] getBytes(String columnLabel) throws SQLException {
-        return get(columnLabel, byte[].class);
-    }
-
-    @Override
-    public Date getDate(String columnLabel) throws SQLException {
-        ArrowType arrowType = getArrowType(columnLabel);
         switch (arrowType.getTypeID()) {
+            // These types don't need any special handling
+            case Null:
+            case Bool:
+            case Int:
+            case FloatingPoint:
+            case Utf8:
+            case LargeUtf8:
+            case Binary:
+            case LargeBinary:
+            case FixedSizeBinary:
+                return storage;
+
             case Date:
-                // In very rare circumstances this could be a Date64 (milliseconds)
                 ArrowType.Date dateType = (ArrowType.Date) arrowType;
-                if (dateType.getUnit() == DateUnit.DAY) {
-                    int daysSinceEpoch = get(columnLabel, Integer.class);
-                    return Date.valueOf(LocalDate.ofEpochDay(daysSinceEpoch));
+                switch (dateType.getUnit()) {
+                    case DAY:
+                        int daysSinceEpoch = Integer.class.cast(storage);
+                        return Date.valueOf(LocalDate.ofEpochDay(daysSinceEpoch));
+                    default:
+                        break;
                 }
+
                 break;
-            default:
-                break;
-
-        }
-
-        throw new SQLException(
-                String.format("Can't get field '%s' as Date (storage type: %s)", columnLabel, arrowType));
-    }
-
-    @Override
-    public Time getTime(String columnLabel) throws SQLException {
-        return get(columnLabel, Time.class);
-    }
-
-    @Override
-    public Timestamp getTimestamp(String columnLabel) throws SQLException {
-        ArrowType arrowType = getArrowType(columnLabel);
-        switch (arrowType.getTypeID()) {
             case Timestamp:
                 ArrowType.Timestamp timestampType = (ArrowType.Timestamp) arrowType;
-                long sinceEpoch = get(columnLabel, Long.class);
+                long sinceEpoch = Long.class.cast(storage);
                 switch (timestampType.getUnit()) {
                     case MICROSECOND:
                         return Timestamp.from(Instant.ofEpochSecond(
@@ -306,28 +159,203 @@ public class WherobotsResultSet implements ResultSet {
                     case SECOND:
                         return Timestamp.from(Instant.ofEpochSecond(sinceEpoch));
                 }
+
+                // Nested types. These need some special if there are any inner types with
+                // datetimes.
+            case Map:
+                return null;
+            case Struct:
+                return null;
+            case List:
+            case LargeList:
+            case FixedSizeList:
+                return null;
+
+            // These types are probably not supported but we can return their storage
+            // as a fallback.
+            case Time:
+            case Interval:
+            case Duration:
+            case Union:
+            case Decimal:
+                return storage;
             default:
                 break;
-
         }
 
         throw new SQLException(
-                String.format("Can't get field '%s' as Timestamp (storage type: %s)", columnLabel, arrowType));
+                String.format("Field '%s' at index %d has unsupported Arrow type %s", arrowField.getName(), columnIndex,
+                        arrowType));
+    }
+
+    private <T> T getTyped(int columnIndex, Class<T> cls) throws SQLException {
+        try {
+            return cls.cast(getObjectImpl(columnIndex));
+        } catch (SQLException e) {
+            throw e;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Override
+    public String getString(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Text.class).toString();
+    }
+
+    @Override
+    public boolean getBoolean(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Boolean.class);
+    }
+
+    @Override
+    public byte getByte(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Byte.class);
+    }
+
+    @Override
+    public short getShort(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Short.class);
+    }
+
+    @Override
+    public int getInt(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Integer.class);
+    }
+
+    @Override
+    public long getLong(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Long.class);
+    }
+
+    @Override
+    public float getFloat(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Float.class);
+    }
+
+    @Override
+    public double getDouble(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Double.class);
+    }
+
+    @Override
+    public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
+        throw new SQLFeatureNotSupportedException();
+    }
+
+    @Override
+    public byte[] getBytes(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, byte[].class);
+    }
+
+    @Override
+    public Date getDate(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Date.class);
+    }
+
+    @Override
+    public Time getTime(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Time.class);
+    }
+
+    @Override
+    public Timestamp getTimestamp(int columnIndex) throws SQLException {
+        return getTyped(columnIndex, Timestamp.class);
+    }
+
+    @Override
+    public InputStream getAsciiStream(int columnIndex) throws SQLException {
+        return new ByteArrayInputStream(getTyped(columnIndex, Text.class).getBytes());
+    }
+
+    @Override
+    public InputStream getUnicodeStream(int columnIndex) throws SQLException {
+        return new ByteArrayInputStream(getTyped(columnIndex, Text.class).getBytes());
+    }
+
+    @Override
+    public InputStream getBinaryStream(int columnIndex) throws SQLException {
+        return new ByteArrayInputStream(getTyped(columnIndex, Text.class).getBytes());
+    }
+
+    @Override
+    public String getString(String columnLabel) throws SQLException {
+        return getString(findColumn(columnLabel));
+    }
+
+    @Override
+    public boolean getBoolean(String columnLabel) throws SQLException {
+        return getBoolean(findColumn(columnLabel));
+    }
+
+    @Override
+    public byte getByte(String columnLabel) throws SQLException {
+        return getByte(findColumn(columnLabel));
+    }
+
+    @Override
+    public short getShort(String columnLabel) throws SQLException {
+        return getShort(findColumn(columnLabel));
+    }
+
+    @Override
+    public int getInt(String columnLabel) throws SQLException {
+        return getInt(findColumn(columnLabel));
+    }
+
+    @Override
+    public long getLong(String columnLabel) throws SQLException {
+        return getLong(findColumn(columnLabel));
+    }
+
+    @Override
+    public float getFloat(String columnLabel) throws SQLException {
+        return getFloat(findColumn(columnLabel));
+    }
+
+    @Override
+    public double getDouble(String columnLabel) throws SQLException {
+        return getDouble(findColumn(columnLabel));
+    }
+
+    @Override
+    public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
+        return getBigDecimal(findColumn(columnLabel));
+    }
+
+    @Override
+    public byte[] getBytes(String columnLabel) throws SQLException {
+        return getBytes(findColumn(columnLabel));
+    }
+
+    @Override
+    public Date getDate(String columnLabel) throws SQLException {
+        return getDate(findColumn(columnLabel));
+    }
+
+    @Override
+    public Time getTime(String columnLabel) throws SQLException {
+        return getTime(findColumn(columnLabel));
+    }
+
+    @Override
+    public Timestamp getTimestamp(String columnLabel) throws SQLException {
+        return getTimestamp(findColumn(columnLabel));
     }
 
     @Override
     public InputStream getAsciiStream(String columnLabel) throws SQLException {
-        return new ByteArrayInputStream(get(columnLabel, Text.class).getBytes());
+        return getAsciiStream(findColumn(columnLabel));
     }
 
     @Override
     public InputStream getUnicodeStream(String columnLabel) throws SQLException {
-        return new ByteArrayInputStream(get(columnLabel, Text.class).getBytes());
+        return getUnicodeStream(findColumn(columnLabel));
     }
 
     @Override
     public InputStream getBinaryStream(String columnLabel) throws SQLException {
-        return new ByteArrayInputStream(get(columnLabel, Text.class).getBytes());
+        return getBinaryStream(findColumn(columnLabel));
     }
 
     @Override
@@ -352,17 +380,17 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public Object getObject(int columnIndex) throws SQLException {
-        return get(columnIndex, Object.class);
+        return getObjectImpl(columnIndex);
     }
 
     @Override
     public Object getObject(String columnLabel) throws SQLException {
-        return get(columnLabel, Object.class);
+        return getObject(findColumn(columnLabel));
     }
 
     @Override
     public int findColumn(String columnLabel) throws SQLException {
-        return metadata.getColumnIndex(columnLabel);
+        return metadata.getColumnIndex(columnLabel) + 1;
     }
 
     @Override
