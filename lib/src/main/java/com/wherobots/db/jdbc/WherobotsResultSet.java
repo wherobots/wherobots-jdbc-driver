@@ -36,7 +36,9 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Map;
 
 public class WherobotsResultSet implements ResultSet {
@@ -106,18 +108,11 @@ public class WherobotsResultSet implements ResultSet {
         }
     }
 
-    private Object getObjectImpl(int columnIndex) throws SQLException {
-        Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
-
-        // Column index is 1-based in JDBC
-        if (columnIndex < 1 || columnIndex > root.getFieldVectors().size()) {
-            throw new SQLException(String.format("Can't get value at index %d from result set with %d columns",
-                    columnIndex, root.getFieldVectors().size()));
+    private Object refineStorage(Object storage, Field arrowField) throws SQLException {
+        if (storage == null) {
+            return null;
         }
 
-        Object storage = root.getVector(columnIndex - 1).getObject(currentVectorRow);
-        this.wasNull = storage == null;
-        Field arrowField = getArrowField(columnIndex);
         ArrowType arrowType = arrowField.getType();
 
         switch (arrowType.getTypeID()) {
@@ -163,13 +158,19 @@ public class WherobotsResultSet implements ResultSet {
                 // Nested types. These need some special if there are any inner types with
                 // datetimes.
             case Map:
-                return null;
+                return storage;
             case Struct:
-                return null;
+                return storage;
             case List:
             case LargeList:
             case FixedSizeList:
-                return null;
+                List<?> sourceList = (List<?>) storage;
+                Field childField = arrowField.getChildren().get(0);
+                ArrayList<Object> refined = new ArrayList<>(sourceList.size());
+                for (Object element : sourceList) {
+                    refined.add(element == null ? null : refineStorage(element, childField));
+                }
+                return refined;
 
             // These types are probably not supported but we can return their storage
             // as a fallback.
@@ -184,8 +185,30 @@ public class WherobotsResultSet implements ResultSet {
         }
 
         throw new SQLException(
-                String.format("Field '%s' at index %d has unsupported Arrow type %s", arrowField.getName(), columnIndex,
+                String.format("Element has unsupported Arrow type %s",
                         arrowType));
+    }
+
+    private Object getObjectImpl(int columnIndex) throws SQLException {
+        Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
+
+        // Column index is 1-based in JDBC
+        if (columnIndex < 1 || columnIndex > root.getFieldVectors().size()) {
+            throw new SQLException(String.format("Can't get value at index %d from result set with %d columns",
+                    columnIndex, root.getFieldVectors().size()));
+        }
+
+        Object storage = root.getVector(columnIndex - 1).getObject(currentVectorRow);
+        this.wasNull = storage == null;
+        Field arrowField = getArrowField(columnIndex);
+
+        try {
+            return refineStorage(storage, arrowField);
+        } catch (Exception e) {
+            throw new SQLException(
+                    String.format("Can't unwrap storage of field '%s' at index %d", arrowField.getName(), columnIndex),
+                    e);
+        }
     }
 
     private <T> T getTyped(int columnIndex, Class<T> cls) throws SQLException {
