@@ -13,7 +13,9 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -102,8 +104,9 @@ class WherobotsJdbcResultSetTest {
                     NULL,
                     CAST('2025-06-16' AS DATE)
                   ) AS array_of_dates_col,
-                  named_struct('x', 10, 'y', 'hello')     AS struct_col,
-                  map('a', 1, 'b', 2)                     AS map_col
+                  map('a', 1, 'b', 2)                     AS map_col,
+                  map('a', CAST('2025-06-15' AS DATE), 'b', null) AS map_of_dates_col,
+                  named_struct('x', 10, 'y', 'hello', 'z', CAST('2025-06-15' AS DATE)) AS struct_col
                 """;
 
         try (Statement stmt = connection.createStatement()) {
@@ -120,23 +123,32 @@ class WherobotsJdbcResultSetTest {
                 // Array of type with custom handling
                 arrayVal = rs.getObject("array_of_dates_col");
                 assertInstanceOf(List.class, arrayVal);
-                assertEquals(Arrays.asList(java.sql.Date.valueOf("2025-06-15"), null, java.sql.Date.valueOf("2025-06-16")),
+                assertEquals(
+                        Arrays.asList(java.sql.Date.valueOf("2025-06-15"), null, java.sql.Date.valueOf("2025-06-16")),
                         arrayVal);
 
                 // Map
-                // Object mapVal = rs.getObject("map_col");
-                // assertInstanceOf(Map.class, mapVal);
-                // assertEquals(Map.of("a", 1, "b", 2), mapVal);
+                Object mapVal = rs.getObject("map_col");
+                assertInstanceOf(Map.class, mapVal);
+                assertEquals(Map.of("a", 1, "b", 2), mapVal);
+
+                // Map of type that needs custom handling
+                mapVal = rs.getObject("map_of_dates_col");
+                assertInstanceOf(Map.class, mapVal);
+                Map<String, Object> expectedMap = new LinkedHashMap<>();
+                expectedMap.put("a", java.sql.Date.valueOf("2025-06-15"));
+                expectedMap.put("b", null);
+                assertEquals(expectedMap, mapVal);
 
                 // Struct
-                // Object structVal = rs.getObject("struct_col");
-                // assertNotNull(structVal);
-                // String structStr = structVal.toString();
-                // assertTrue(structStr.contains("10"), "struct should contain field value 10");
-                // assertTrue(structStr.contains("hello"), "struct should contain field value
-                // 'hello'");
+                Object structVal = rs.getObject("struct_col");
+                assertNotNull(structVal);
 
-                assertFalse(rs.next(), "expected only one row");
+                Map<String, Object> structMap = (Map<String, Object>) structVal;
+                assertEquals(3, structMap.size());
+                assertEquals(10, structMap.get("x"));
+                assertEquals("hello", structMap.get("y").toString());
+                assertEquals(java.sql.Date.valueOf("2025-06-15"), structMap.get("z"));
             }
         }
     }

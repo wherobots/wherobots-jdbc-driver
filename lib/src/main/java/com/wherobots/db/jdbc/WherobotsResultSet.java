@@ -1,5 +1,7 @@
 package com.wherobots.db.jdbc;
 
+import org.apache.arrow.flatbuf.LargeUtf8;
+import org.apache.arrow.flatbuf.Utf8View;
 import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
@@ -38,8 +40,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 public class WherobotsResultSet implements ResultSet {
 
@@ -154,13 +158,44 @@ public class WherobotsResultSet implements ResultSet {
                     case SECOND:
                         return Timestamp.from(Instant.ofEpochSecond(sinceEpoch));
                 }
+                break;
 
-                // Nested types. These need some special if there are any inner types with
-                // datetimes.
+            // Nested types. These need some special if there are any inner types with
+            // datetimes.
             case Map:
-                return storage;
+                Field mapEntryField = arrowField.getChildren().get(0);
+                Field keyField = mapEntryField.getChildren().get(0);
+                Field valueField = mapEntryField.getChildren().get(1);
+
+                // Check key storage. We only support string storage so we can return
+                // Map<String, Object>
+                switch (keyField.getType().getTypeID()) {
+                    case Utf8:
+                    case LargeUtf8:
+                        break;
+                    default:
+                        throw new SQLException(String.format(
+                                "Unsupported key storage for Map (expected String, got %s)", keyField.getType()));
+                }
+
+                List<Map<String, ?>> entries = (List<Map<String, ?>>) storage;
+                LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+                for (Map<String, ?> entry : entries) {
+                    String k = ((Text) entry.get(keyField.getName())).toString();
+                    Object v = refineStorage(entry.get(valueField.getName()), valueField);
+                    map.put(k, v);
+                }
+                return map;
             case Struct:
-                return storage;
+                LinkedHashMap<String, Object> refinedStructMap = new LinkedHashMap<>();
+                Map<String, ?> storageStructMap = (Map<String, ?>) storage;
+                int index = 0;
+                for (Entry<String, ?> entry : storageStructMap.entrySet()) {
+                    Field structField = arrowField.getChildren().get(index++);
+                    refinedStructMap.put(entry.getKey(), refineStorage(entry.getValue(), structField));
+                }
+
+                return refinedStructMap;
             case List:
             case LargeList:
             case FixedSizeList:
