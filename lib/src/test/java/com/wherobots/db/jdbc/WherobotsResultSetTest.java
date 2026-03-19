@@ -21,7 +21,7 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named = "WHEROBOTS_API_KEY", matches = ".+")
-class WherobotsJdbcResultSetTest {
+class WherobotsResultSetTest {
 
     private static Connection connection;
 

@@ -92,7 +92,7 @@ signing {
 
 test {
     useJUnitPlatform()
-    jvmArgs += ["--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED"]
+    jvmArgs += ["--add-opens=java.base/java.nio=ALL-UNNAMED"]
     ["WHEROBOTS_API_KEY", "WHEROBOTS_HOST", "WHEROBOTS_SHUTDOWN_AFTER_INACTIVE_SECONDS"].each { key ->
         def val = System.getenv(key)
         if (val != null) {
