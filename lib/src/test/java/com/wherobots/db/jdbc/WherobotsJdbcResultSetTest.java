@@ -27,12 +27,18 @@ class WherobotsJdbcResultSetTest {
     static void setUp() throws Exception {
         DriverManager.registerDriver(new WherobotsJdbcDriver());
 
+        String host = System.getenv().getOrDefault("WHEROBOTS_HOST", "api.cloud.wherobots.com");
+        String api_key = System.getenv("WHEROBOTS_API_KEY");
+        String timeoutString = System.getenv("WHEROBOTS_SHUTDOWN_AFTER_INACTIVE_SECONDS");
+
         Properties props = new Properties();
-        props.put(WherobotsJdbcDriver.API_KEY_PROP, System.getenv("WHEROBOTS_API_KEY"));
+        props.put(WherobotsJdbcDriver.API_KEY_PROP, api_key);
         props.put(WherobotsJdbcDriver.SESSION_TYPE_PROP, SessionType.SINGLE.name());
         props.put(WherobotsJdbcDriver.FORCE_NEW_PROP, "false");
+        if (timeoutString != null) {
+            props.put(WherobotsJdbcDriver.SHUTDOWN_AFTER_INACTIVE_SECONDS_PROP, Integer.valueOf(timeoutString));
+        }
 
-        String host = System.getenv().getOrDefault("WHEROBOTS_HOST", "api.cloud.wherobots.com");
         connection = DriverManager.getConnection("jdbc:wherobots://" + host, props);
     }
 

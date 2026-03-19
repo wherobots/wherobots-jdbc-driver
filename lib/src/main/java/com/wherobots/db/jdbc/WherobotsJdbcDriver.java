@@ -35,6 +35,7 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String VERSION_PROP = "version";
     public static final String SESSION_TYPE_PROP = "sessionType";
     public static final String FORCE_NEW_PROP = "forceNew";
+    public static final String SHUTDOWN_AFTER_INACTIVE_SECONDS_PROP = "shutdownAfterInactiveSeconds";
     public static final String WS_URI_PROP = "wsUri";
 
     // Results format; one of {@link DataFormat}
@@ -108,6 +109,12 @@ public class WherobotsJdbcDriver implements Driver {
             forceNew = Boolean.parseBoolean(forceNewStr);
         }
 
+        Integer shutdownAfterInactiveSeconds = null;
+        String shutdownStr = info.getProperty(SHUTDOWN_AFTER_INACTIVE_SECONDS_PROP);
+        if (StringUtils.isNotBlank(shutdownStr)) {
+            shutdownAfterInactiveSeconds = Integer.parseInt(shutdownStr);
+        }
+
         Map<String, String> headers = new HashMap<>(getAuthHeaders(info));
         headers.putAll(getUserAgentHeader());
         WherobotsSession session;
@@ -128,6 +135,7 @@ public class WherobotsJdbcDriver implements Driver {
                     version,
                     sessionType,
                     forceNew,
+                    shutdownAfterInactiveSeconds,
                     headers
             );
         }
