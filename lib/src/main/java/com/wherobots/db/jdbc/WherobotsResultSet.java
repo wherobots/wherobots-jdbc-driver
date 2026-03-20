@@ -258,7 +258,12 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public String getString(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Text.class).toString();
+        Text text = getTyped(columnIndex, Text.class);
+        if (text == null) {
+            return null;
+        } else {
+            return text.toString();
+        }
     }
 
     @Override
@@ -323,17 +328,42 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public InputStream getAsciiStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(getTyped(columnIndex, Text.class).getBytes());
+        Text text = getTyped(columnIndex, Text.class);
+        if (text == null) {
+            return null;
+        } else {
+            return new ByteArrayInputStream(text.getBytes());
+        }
     }
 
     @Override
     public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(getTyped(columnIndex, Text.class).getBytes());
+        Text text = getTyped(columnIndex, Text.class);
+        if (text == null) {
+            return null;
+        } else {
+            return new ByteArrayInputStream(text.getBytes());
+        }
+    }
+
+    @Override
+    public Reader getCharacterStream(int columnIndex) throws SQLException {
+        Text text = getTyped(columnIndex, Text.class);
+        if (text == null) {
+            return null;
+        } else {
+            return new StringReader(text.toString());
+        }
     }
 
     @Override
     public InputStream getBinaryStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(getTyped(columnIndex, Text.class).getBytes());
+        byte[] bytes = getBytes(columnIndex);
+        if (bytes == null) {
+            return null;
+        } else {
+            return new ByteArrayInputStream(bytes);
+        }
     }
 
     @Override
@@ -449,11 +479,6 @@ public class WherobotsResultSet implements ResultSet {
     @Override
     public int findColumn(String columnLabel) throws SQLException {
         return metadata.getColumnIndex(columnLabel) + 1;
-    }
-
-    @Override
-    public Reader getCharacterStream(int columnIndex) throws SQLException {
-        return new StringReader(getString(columnIndex));
     }
 
     @Override
