@@ -246,9 +246,14 @@ public class WherobotsResultSet implements ResultSet {
         }
     }
 
-    private <T> T getTyped(int columnIndex, Class<T> cls) throws SQLException {
+    private <T> T getTypedPrimitive(int columnIndex, Class<T> cls, T valueIfNull) throws SQLException {
         try {
-            return cls.cast(getObjectImpl(columnIndex));
+            T maybeValue = cls.cast(getObjectImpl(columnIndex));
+            if (maybeValue == null) {
+                return valueIfNull;
+            } else {
+                return maybeValue;
+            }
         } catch (SQLException e) {
             throw e;
         } catch (Exception e) {
@@ -258,7 +263,7 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public String getString(int columnIndex) throws SQLException {
-        Text text = getTyped(columnIndex, Text.class);
+        Text text = getTypedPrimitive(columnIndex, Text.class, null);
         if (text == null) {
             return null;
         } else {
@@ -268,37 +273,37 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public boolean getBoolean(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Boolean.class);
+        return getTypedPrimitive(columnIndex, Boolean.class, false);
     }
 
     @Override
     public byte getByte(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Byte.class);
+        return getTypedPrimitive(columnIndex, Byte.class, (byte) 0);
     }
 
     @Override
     public short getShort(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Short.class);
+        return getTypedPrimitive(columnIndex, Short.class, (short) 0);
     }
 
     @Override
     public int getInt(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Integer.class);
+        return getTypedPrimitive(columnIndex, Integer.class, 0);
     }
 
     @Override
     public long getLong(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Long.class);
+        return getTypedPrimitive(columnIndex, Long.class, 0L);
     }
 
     @Override
     public float getFloat(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Float.class);
+        return getTypedPrimitive(columnIndex, Float.class, (float) 0.0);
     }
 
     @Override
     public double getDouble(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Double.class);
+        return getTypedPrimitive(columnIndex, Double.class, 0.0);
     }
 
     @Override
@@ -308,27 +313,27 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public byte[] getBytes(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, byte[].class);
+        return getTypedPrimitive(columnIndex, byte[].class, null);
     }
 
     @Override
     public Date getDate(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Date.class);
+        return getTypedPrimitive(columnIndex, Date.class, null);
     }
 
     @Override
     public Time getTime(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Time.class);
+        return getTypedPrimitive(columnIndex, Time.class, null);
     }
 
     @Override
     public Timestamp getTimestamp(int columnIndex) throws SQLException {
-        return getTyped(columnIndex, Timestamp.class);
+        return getTypedPrimitive(columnIndex, Timestamp.class, null);
     }
 
     @Override
     public InputStream getAsciiStream(int columnIndex) throws SQLException {
-        Text text = getTyped(columnIndex, Text.class);
+        Text text = getTypedPrimitive(columnIndex, Text.class, null);
         if (text == null) {
             return null;
         } else {
@@ -338,7 +343,7 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-        Text text = getTyped(columnIndex, Text.class);
+        Text text = getTypedPrimitive(columnIndex, Text.class, null);
         if (text == null) {
             return null;
         } else {
@@ -348,7 +353,7 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public Reader getCharacterStream(int columnIndex) throws SQLException {
-        Text text = getTyped(columnIndex, Text.class);
+        Text text = getTypedPrimitive(columnIndex, Text.class, null);
         if (text == null) {
             return null;
         } else {
