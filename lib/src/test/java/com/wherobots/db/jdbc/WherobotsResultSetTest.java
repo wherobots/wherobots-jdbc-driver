@@ -177,6 +177,101 @@ class WherobotsResultSetTest {
     }
 
     @Test
+    void getStringOnNonNullColumns() throws Exception {
+        String sql = """
+                SELECT
+                  CAST('hello' AS STRING)           AS str_col,
+                  CAST(TRUE AS BOOLEAN)             AS bool_col,
+                  CAST(42 AS TINYINT)               AS byte_col,
+                  CAST(1234 AS SMALLINT)            AS short_col,
+                  CAST(100000 AS INT)               AS int_col,
+                  CAST(9999999999 AS BIGINT)         AS long_col,
+                  CAST(3.14 AS FLOAT)               AS float_col,
+                  CAST(2.718281828 AS DOUBLE)        AS double_col,
+                  CAST('2025-06-15' AS DATE)         AS date_col,
+                  CAST('2025-06-15T10:30:00' AS TIMESTAMP) AS timestamp_col
+                """;
+
+        try (Statement stmt = connection.createStatement()) {
+            assertTrue(stmt.execute(sql));
+
+            try (ResultSet rs = stmt.getResultSet()) {
+                assertTrue(rs.next(), "expected one row");
+
+                assertEquals("hello", rs.getString("str_col"));
+                assertFalse(rs.wasNull());
+
+                assertEquals("true", rs.getString("bool_col"));
+                assertFalse(rs.wasNull());
+
+                assertEquals("42", rs.getString("byte_col"));
+                assertFalse(rs.wasNull());
+
+                assertEquals("1234", rs.getString("short_col"));
+                assertFalse(rs.wasNull());
+
+                assertEquals("100000", rs.getString("int_col"));
+                assertFalse(rs.wasNull());
+
+                assertEquals("9999999999", rs.getString("long_col"));
+                assertFalse(rs.wasNull());
+
+                assertNotNull(rs.getString("float_col"));
+                assertTrue(rs.getString("float_col").startsWith("3.14"));
+                assertFalse(rs.wasNull());
+
+                assertNotNull(rs.getString("double_col"));
+                assertTrue(rs.getString("double_col").startsWith("2.71828"));
+                assertFalse(rs.wasNull());
+
+                assertEquals("2025-06-15", rs.getString("date_col"));
+                assertFalse(rs.wasNull());
+
+                assertNotNull(rs.getString("timestamp_col"));
+                assertTrue(rs.getString("timestamp_col").contains("2025-06-15"));
+                assertFalse(rs.wasNull());
+
+                assertFalse(rs.next(), "expected only one row");
+            }
+        }
+    }
+
+    @Test
+    void getStringOnNullColumns() throws Exception {
+        String sql = """
+                SELECT
+                  CAST(NULL AS STRING)              AS str_col,
+                  CAST(NULL AS BOOLEAN)             AS bool_col,
+                  CAST(NULL AS TINYINT)             AS byte_col,
+                  CAST(NULL AS SMALLINT)            AS short_col,
+                  CAST(NULL AS INT)                 AS int_col,
+                  CAST(NULL AS BIGINT)              AS long_col,
+                  CAST(NULL AS FLOAT)               AS float_col,
+                  CAST(NULL AS DOUBLE)              AS double_col,
+                  CAST(NULL AS BINARY)              AS bytes_col,
+                  CAST(NULL AS DATE)                AS date_col,
+                  CAST(NULL AS TIMESTAMP)           AS timestamp_col
+                """;
+
+        try (Statement stmt = connection.createStatement()) {
+            assertTrue(stmt.execute(sql));
+
+            try (ResultSet rs = stmt.getResultSet()) {
+                assertTrue(rs.next(), "expected one row");
+
+                for (String col : List.of("str_col", "bool_col", "byte_col", "short_col",
+                        "int_col", "long_col", "float_col", "double_col",
+                        "bytes_col", "date_col", "timestamp_col")) {
+                    assertNull(rs.getString(col), "getString(" + col + ") should return null");
+                    assertTrue(rs.wasNull(), "wasNull() should be true after getString(" + col + ")");
+                }
+
+                assertFalse(rs.next(), "expected only one row");
+            }
+        }
+    }
+
+    @Test
     void getNestedTypes() throws Exception {
         String sql = """
                 SELECT

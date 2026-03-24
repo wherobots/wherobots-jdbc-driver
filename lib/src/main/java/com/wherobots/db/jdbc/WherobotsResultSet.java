@@ -263,11 +263,11 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public String getString(int columnIndex) throws SQLException {
-        Text text = getTypedPrimitive(columnIndex, Text.class, null);
-        if (text == null) {
+        Object value = getObjectImpl(columnIndex);
+        if (value == null) {
             return null;
         } else {
-            return text.toString();
+            return value.toString();
         }
     }
 
