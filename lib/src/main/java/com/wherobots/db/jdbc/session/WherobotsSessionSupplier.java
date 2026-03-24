@@ -62,7 +62,8 @@ public abstract class WherobotsSessionSupplier {
      */
     public static WherobotsSession create(String host, Runtime runtime, Region region,
                                           String version, SessionType sessionType,
-                                          boolean forceNew, Map<String, String> headers)
+                                          boolean forceNew, Integer shutdownAfterInactiveSeconds,
+                                          Map<String, String> headers)
         throws SQLException {
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -77,7 +78,7 @@ public abstract class WherobotsSessionSupplier {
         Retry retry = RetryRegistry.of(config).retry("session");
 
         try {
-            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, version, sessionType, forceNew).get();
+            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, version, sessionType, forceNew, shutdownAfterInactiveSeconds).get();
             URI wsUri = Retry.decorateCheckedSupplier(retry, new SessionWsUriSupplier(client, headers, sessionIdUri)).get();
             return create(wsUri, headers);
         } catch (SQLException e) {
@@ -115,7 +116,8 @@ public abstract class WherobotsSessionSupplier {
                                       Region region,
                                       String version,
                                       SessionType sessionType,
-                                      boolean forceNew)
+                                      boolean forceNew,
+                                      Integer shutdownAfterInactiveSeconds)
             implements CheckedSupplier<URI> {
 
         @Override
@@ -131,7 +133,7 @@ public abstract class WherobotsSessionSupplier {
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(
                     JsonUtil.serialize(new SqlSessionRequestPayload(
                         runtime.name,
-                        null,
+                        shutdownAfterInactiveSeconds,
                         version,
                         sessionType.name)));
 

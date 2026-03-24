@@ -3,6 +3,8 @@ package com.wherobots.db.jdbc;
 import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.util.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +34,12 @@ import java.sql.SQLXML;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class WherobotsResultSet implements ResultSet {
@@ -93,14 +100,162 @@ public class WherobotsResultSet implements ResultSet {
         return this.wasNull;
     }
 
-    private <T> T get(int columnIndex, Class<T> cls) throws SQLException {
+    private Field getArrowField(int columnIndex) throws SQLException {
         try {
-            Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
-
             // Column index is 1-based in JDBC
-            Object value = root.getVector(columnIndex - 1).getObject(currentVectorRow);
-            this.wasNull = value == null;
-            return cls.cast(value);
+            return root.getSchema().getFields().get(columnIndex - 1);
+        } catch (Exception e) {
+            throw new SQLException(String.format("Error accessing field for column at index %d", columnIndex), e);
+        }
+    }
+
+    private Object refineStorage(Object storage, Field arrowField) throws SQLException {
+        if (storage == null) {
+            return null;
+        }
+
+        ArrowType arrowType = arrowField.getType();
+
+        switch (arrowType.getTypeID()) {
+            // These types don't need any special handling
+            case Null:
+            case Bool:
+            case Int:
+            case FloatingPoint:
+            case Utf8:
+            case LargeUtf8:
+            case Binary:
+            case LargeBinary:
+            case FixedSizeBinary:
+                return storage;
+
+            case Date:
+                ArrowType.Date dateType = (ArrowType.Date) arrowType;
+                switch (dateType.getUnit()) {
+                    case DAY:
+                        int daysSinceEpoch = Integer.class.cast(storage);
+                        return Date.valueOf(LocalDate.ofEpochDay(daysSinceEpoch));
+                    case MILLISECOND:
+                        long msSinceEpoch = Long.class.cast(storage);
+                        return new Date(msSinceEpoch);
+                }
+                break;
+
+            case Timestamp:
+                ArrowType.Timestamp timestampType = (ArrowType.Timestamp) arrowType;
+                long sinceEpoch = Long.class.cast(storage);
+                switch (timestampType.getUnit()) {
+                    case MICROSECOND:
+                        return Timestamp.from(Instant.ofEpochSecond(
+                                sinceEpoch / 1_000_000, (sinceEpoch % 1_000_000) * 1_000));
+                    case MILLISECOND:
+                        return Timestamp.from(Instant.ofEpochMilli(sinceEpoch));
+                    case NANOSECOND:
+                        return Timestamp.from(Instant.ofEpochSecond(
+                                sinceEpoch / 1_000_000_000, sinceEpoch % 1_000_000_000));
+                    case SECOND:
+                        return Timestamp.from(Instant.ofEpochSecond(sinceEpoch));
+                }
+                break;
+
+            // Nested types. These need some special if there are any inner types with
+            // datetimes.
+            case Map:
+                Field mapEntryField = arrowField.getChildren().get(0);
+                Field keyField = mapEntryField.getChildren().get(0);
+                Field valueField = mapEntryField.getChildren().get(1);
+
+                // Check key storage. We only support string storage so we can return
+                // Map<String, Object>
+                switch (keyField.getType().getTypeID()) {
+                    case Utf8:
+                    case LargeUtf8:
+                        break;
+                    default:
+                        throw new SQLException(String.format(
+                                "Unsupported key storage for Map (expected String, got %s)", keyField.getType()));
+                }
+
+                List<?> entries = (List<?>) storage;
+                LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+                for (Object rawEntry : entries) {
+                    Map<?, ?> entry = (Map<?, ?>) rawEntry;
+                    String k = ((Text) entry.get(keyField.getName())).toString();
+                    Object v = refineStorage(entry.get(valueField.getName()), valueField);
+                    map.put(k, v);
+                }
+                return map;
+
+            case Struct:
+                LinkedHashMap<String, Object> refinedStructMap = new LinkedHashMap<>();
+                Map<?, ?> storageStructMap = (Map<?, ?>) storage;
+                int index = 0;
+                for (Map.Entry<?, ?> entry : storageStructMap.entrySet()) {
+                    Field structField = arrowField.getChildren().get(index++);
+                    refinedStructMap.put(entry.getKey().toString(), refineStorage(entry.getValue(), structField));
+                }
+                return refinedStructMap;
+
+            case List:
+            case LargeList:
+            case FixedSizeList:
+                List<?> sourceList = (List<?>) storage;
+                Field childField = arrowField.getChildren().get(0);
+                ArrayList<Object> refined = new ArrayList<>(sourceList.size());
+                for (Object element : sourceList) {
+                    refined.add(element == null ? null : refineStorage(element, childField));
+                }
+                return refined;
+
+            // These types are probably not supported but we can return their storage
+            // as a fallback.
+            case Time:
+            case Interval:
+            case Duration:
+            case Union:
+            case Decimal:
+                return storage;
+            default:
+                break;
+        }
+
+        throw new SQLException(
+                String.format("Element has unsupported Arrow type %s",
+                        arrowType));
+    }
+
+    private Object getObjectImpl(int columnIndex) throws SQLException {
+        Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
+
+        // Column index is 1-based in JDBC
+        if (columnIndex < 1 || columnIndex > root.getFieldVectors().size()) {
+            throw new SQLException(String.format("Can't get value at index %d from result set with %d columns",
+                    columnIndex, root.getFieldVectors().size()));
+        }
+
+        Object storage = root.getVector(columnIndex - 1).getObject(currentVectorRow);
+        this.wasNull = storage == null;
+        Field arrowField = getArrowField(columnIndex);
+
+        try {
+            return refineStorage(storage, arrowField);
+        } catch (Exception e) {
+            throw new SQLException(
+                    String.format("Can't unwrap storage of field '%s' at index %d", arrowField.getName(), columnIndex),
+                    e);
+        }
+    }
+
+    private <T> T getTypedPrimitive(int columnIndex, Class<T> cls, T valueIfNull) throws SQLException {
+        try {
+            T maybeValue = cls.cast(getObjectImpl(columnIndex));
+            if (maybeValue == null) {
+                return valueIfNull;
+            } else {
+                return maybeValue;
+            }
+        } catch (SQLException e) {
+            throw e;
         } catch (Exception e) {
             throw new SQLException(e);
         }
@@ -108,42 +263,47 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public String getString(int columnIndex) throws SQLException {
-        return get(columnIndex, Text.class).toString();
+        Object value = getObjectImpl(columnIndex);
+        if (value == null) {
+            return null;
+        } else {
+            return value.toString();
+        }
     }
 
     @Override
     public boolean getBoolean(int columnIndex) throws SQLException {
-        return get(columnIndex, Boolean.class);
+        return getTypedPrimitive(columnIndex, Boolean.class, false);
     }
 
     @Override
     public byte getByte(int columnIndex) throws SQLException {
-        return get(columnIndex, Byte.class);
+        return getTypedPrimitive(columnIndex, Byte.class, (byte) 0);
     }
 
     @Override
     public short getShort(int columnIndex) throws SQLException {
-        return get(columnIndex, Short.class);
+        return getTypedPrimitive(columnIndex, Short.class, (short) 0);
     }
 
     @Override
     public int getInt(int columnIndex) throws SQLException {
-        return get(columnIndex, Integer.class);
+        return getTypedPrimitive(columnIndex, Integer.class, 0);
     }
 
     @Override
     public long getLong(int columnIndex) throws SQLException {
-        return get(columnIndex, Long.class);
+        return getTypedPrimitive(columnIndex, Long.class, 0L);
     }
 
     @Override
     public float getFloat(int columnIndex) throws SQLException {
-        return get(columnIndex, Float.class);
+        return getTypedPrimitive(columnIndex, Float.class, (float) 0.0);
     }
 
     @Override
     public double getDouble(int columnIndex) throws SQLException {
-        return get(columnIndex, Double.class);
+        return getTypedPrimitive(columnIndex, Double.class, 0.0);
     }
 
     @Override
@@ -153,129 +313,142 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public byte[] getBytes(int columnIndex) throws SQLException {
-        return get(columnIndex, byte[].class);
+        return getTypedPrimitive(columnIndex, byte[].class, null);
     }
 
     @Override
     public Date getDate(int columnIndex) throws SQLException {
-        return get(columnIndex, Date.class);
+        return getTypedPrimitive(columnIndex, Date.class, null);
     }
 
     @Override
     public Time getTime(int columnIndex) throws SQLException {
-        return get(columnIndex, Time.class);
+        return getTypedPrimitive(columnIndex, Time.class, null);
     }
 
     @Override
     public Timestamp getTimestamp(int columnIndex) throws SQLException {
-        return get(columnIndex, Timestamp.class);
+        return getTypedPrimitive(columnIndex, Timestamp.class, null);
     }
 
     @Override
     public InputStream getAsciiStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(get(columnIndex, Text.class).getBytes());
+        Text text = getTypedPrimitive(columnIndex, Text.class, null);
+        if (text == null) {
+            return null;
+        } else {
+            return new ByteArrayInputStream(text.getBytes());
+        }
     }
 
     @Override
     public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(get(columnIndex, Text.class).getBytes());
+        Text text = getTypedPrimitive(columnIndex, Text.class, null);
+        if (text == null) {
+            return null;
+        } else {
+            return new ByteArrayInputStream(text.getBytes());
+        }
+    }
+
+    @Override
+    public Reader getCharacterStream(int columnIndex) throws SQLException {
+        Text text = getTypedPrimitive(columnIndex, Text.class, null);
+        if (text == null) {
+            return null;
+        } else {
+            return new StringReader(text.toString());
+        }
     }
 
     @Override
     public InputStream getBinaryStream(int columnIndex) throws SQLException {
-        return new ByteArrayInputStream(get(columnIndex, Text.class).getBytes());
-    }
-
-    private <T> T get(String columnLabel, Class<T> cls) throws SQLException {
-        try {
-            Preconditions.checkState(currentVectorRow >= 0 && currentVectorRow < root.getRowCount());
-            Object value = root.getVector(columnLabel).getObject(currentVectorRow);
-            return cls.cast(value);
-        } catch (Exception e) {
-            throw new SQLException(
-                    String.format("Error accessing column %s from current row %d of resultset", columnLabel, currentRow),
-                    e);
+        byte[] bytes = getBytes(columnIndex);
+        if (bytes == null) {
+            return null;
+        } else {
+            return new ByteArrayInputStream(bytes);
         }
     }
 
     @Override
     public String getString(String columnLabel) throws SQLException {
-        return get(columnLabel, Text.class).toString();
+        return getString(findColumn(columnLabel));
     }
 
     @Override
     public boolean getBoolean(String columnLabel) throws SQLException {
-        return get(columnLabel, Boolean.class);
+        return getBoolean(findColumn(columnLabel));
     }
 
     @Override
     public byte getByte(String columnLabel) throws SQLException {
-        return get(columnLabel, Byte.class);
+        return getByte(findColumn(columnLabel));
     }
 
     @Override
     public short getShort(String columnLabel) throws SQLException {
-        return get(columnLabel, Short.class);
+        return getShort(findColumn(columnLabel));
     }
 
     @Override
     public int getInt(String columnLabel) throws SQLException {
-        return get(columnLabel, Integer.class);
+        return getInt(findColumn(columnLabel));
     }
 
     @Override
     public long getLong(String columnLabel) throws SQLException {
-        return get(columnLabel, Long.class);
+        return getLong(findColumn(columnLabel));
     }
 
     @Override
     public float getFloat(String columnLabel) throws SQLException {
-        return get(columnLabel, Float.class);
+        return getFloat(findColumn(columnLabel));
     }
 
     @Override
     public double getDouble(String columnLabel) throws SQLException {
-        return get(columnLabel, Double.class);
+        return getDouble(findColumn(columnLabel));
     }
 
     @Override
     public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-        throw new SQLFeatureNotSupportedException("BigDecimal isn't supported");
+        return getBigDecimal(findColumn(columnLabel));
     }
 
     @Override
     public byte[] getBytes(String columnLabel) throws SQLException {
-        return get(columnLabel, byte[].class);
+        return getBytes(findColumn(columnLabel));
     }
 
     @Override
     public Date getDate(String columnLabel) throws SQLException {
-        return get(columnLabel, Date.class);
+        return getDate(findColumn(columnLabel));
     }
 
     @Override
     public Time getTime(String columnLabel) throws SQLException {
-        return get(columnLabel, Time.class);
+        return getTime(findColumn(columnLabel));
     }
 
     @Override
     public Timestamp getTimestamp(String columnLabel) throws SQLException {
-        return get(columnLabel, Timestamp.class);
+        return getTimestamp(findColumn(columnLabel));
     }
 
     @Override
     public InputStream getAsciiStream(String columnLabel) throws SQLException {
-        return new ByteArrayInputStream(get(columnLabel, Text.class).getBytes());
+        return getAsciiStream(findColumn(columnLabel));
     }
 
     @Override
     public InputStream getUnicodeStream(String columnLabel) throws SQLException {
-        return new ByteArrayInputStream(get(columnLabel, Text.class).getBytes());
+        return getUnicodeStream(findColumn(columnLabel));
     }
 
     @Override
     public InputStream getBinaryStream(String columnLabel) throws SQLException {
-        return new ByteArrayInputStream(get(columnLabel, Text.class).getBytes());
+        return getBinaryStream(findColumn(columnLabel));
     }
 
     @Override
@@ -300,22 +473,17 @@ public class WherobotsResultSet implements ResultSet {
 
     @Override
     public Object getObject(int columnIndex) throws SQLException {
-        return get(columnIndex, Object.class);
+        return getObjectImpl(columnIndex);
     }
 
     @Override
     public Object getObject(String columnLabel) throws SQLException {
-        return get(columnLabel, Object.class);
+        return getObject(findColumn(columnLabel));
     }
 
     @Override
     public int findColumn(String columnLabel) throws SQLException {
-        return metadata.getColumnIndex(columnLabel);
-    }
-
-    @Override
-    public Reader getCharacterStream(int columnIndex) throws SQLException {
-        return new StringReader(getString(columnIndex));
+        return metadata.getColumnIndex(columnLabel) + 1;
     }
 
     @Override

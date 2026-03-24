@@ -7,7 +7,7 @@
  */
 
 plugins {
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.gradleup.shadow' version '8.3.10'
     id 'java-library'
     id 'net.thebugmc.gradle.sonatype-central-portal-publisher' version '1.2.4'
     id 'signing'
@@ -59,8 +59,9 @@ dependencies {
     implementation 'io.github.resilience4j:resilience4j-retry:2.2.0'
     implementation 'org.slf4j:slf4j-simple:2.0.13'
     // Test dependencies
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.12.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.12.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
     testImplementation 'org.mockito:mockito-core:5.11.0'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
 }
@@ -91,6 +92,13 @@ signing {
 
 test {
     useJUnitPlatform()
+    jvmArgs += ["--add-opens=java.base/java.nio=ALL-UNNAMED"]
+    ["WHEROBOTS_API_KEY", "WHEROBOTS_HOST", "WHEROBOTS_SHUTDOWN_AFTER_INACTIVE_SECONDS"].each { key ->
+        def val = System.getenv(key)
+        if (val != null) {
+            environment key, val
+        }
+    }
 }
 
 // Run this task with `./gradlew runSmokeTest -Papikey=<your_api_key>`
