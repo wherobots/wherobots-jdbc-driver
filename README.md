@@ -6,7 +6,8 @@
 
 A JDBC driver for [Wherobots Spatial SQL](https://www.wherobots.com), enabling
 Java, Scala, and Kotlin applications to interact with WherobotsDB and leverage
-its powerful geospatial analytics capabilities.
+its powerful geospatial analytics capabilities. The driver is compiled against
+JDK 17 and requires Java 17 or later.
 
 This driver is also compatible with database tools like [JetBrains
 DataGrip](https://www.jetbrains.com/datagrip/) and
@@ -18,7 +19,7 @@ DataGrip](https://www.jetbrains.com/datagrip/) and
 
 ```gradle
 dependencies {
-    implementation 'com.wherobots.jdbc:wherobots-jdbc-driver:0.2.2'
+    implementation 'com.wherobots.jdbc:wherobots-jdbc-driver:0.3.0'
 }
 ```
 
@@ -28,7 +29,7 @@ dependencies {
 <dependency>
     <groupId>com.wherobots.jdbc</groupId>
     <artifactId>wherobots-jdbc-driver</artifactId>
-    <version>0.2.2</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
