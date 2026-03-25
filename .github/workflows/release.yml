@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -47,7 +51,7 @@ jobs:
 
       - name: Cache Gradle packages
         if: steps.tag_check.outputs.exists == 'false'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
@@ -57,6 +61,8 @@ jobs:
       - name: Import GPG key
         if: steps.tag_check.outputs.exists == 'false'
         run: |
+          # GPG_PRIVATE_KEY must be stored as base64-encoded:
+          #   gpg --export-secret-keys --armor <KEY_ID> | base64 | pbcopy
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --batch --import
           echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
           gpgconf --kill gpg-agent
