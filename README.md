@@ -130,6 +130,7 @@ The `region` property accepts the following values:
 |--------|----------|
 | `AWS_US_WEST_2` | US West (Oregon) - default |
 | `AWS_US_EAST_1` | US East (N. Virginia) |
+| `AWS_US_EAST_2` | US East (Ohio) |
 | `AWS_EU_WEST_1` | EU (Ireland) |
 | `AWS_AP_SOUTH_1` | Asia Pacific (Mumbai) |
 
