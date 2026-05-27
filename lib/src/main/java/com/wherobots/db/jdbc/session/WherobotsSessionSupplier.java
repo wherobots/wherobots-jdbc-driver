@@ -3,8 +3,6 @@ package com.wherobots.db.jdbc.session;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.wherobots.db.AppStatus;
-import com.wherobots.db.Region;
-import com.wherobots.db.Runtime;
 import com.wherobots.db.SessionType;
 import com.wherobots.db.jdbc.serde.JsonUtil;
 import io.github.resilience4j.core.IntervalFunction;
@@ -35,8 +33,21 @@ public abstract class WherobotsSessionSupplier {
 
     private static final Logger logger = LoggerFactory.getLogger(WherobotsSessionSupplier.class);
 
-    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?region=%s&force_new=%s";
+    private static final String SQL_SESSION_ENDPOINT = "https://%s/sql/session?force_new=%s";
     private static final String PROTOCOL_VERSION = "1.0.0";
+
+    /**
+     * Builds the SQL session creation URL, appending {@code region} only when
+     * one was provided. An omitted region lets the API apply the
+     * organization's configured default region.
+     */
+    static String buildSessionUri(String host, String region, boolean forceNew) {
+        StringBuilder uri = new StringBuilder(String.format(SQL_SESSION_ENDPOINT, host, forceNew));
+        if (region != null && !region.isBlank()) {
+            uri.append("&region=").append(region);
+        }
+        return uri.toString();
+    }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private record SqlSessionRequestPayload(
@@ -60,7 +71,7 @@ public abstract class WherobotsSessionSupplier {
      * @return
      * @throws SQLException
      */
-    public static WherobotsSession create(String host, Runtime runtime, Region region,
+    public static WherobotsSession create(String host, String runtime, String region,
                                           String version, SessionType sessionType,
                                           boolean forceNew, Integer shutdownAfterInactiveSeconds,
                                           Map<String, String> headers)
@@ -112,8 +123,8 @@ public abstract class WherobotsSessionSupplier {
     private record SqlSessionSupplier(HttpClient client,
                                       Map<String, String> headers,
                                       String host,
-                                      Runtime runtime,
-                                      Region region,
+                                      String runtime,
+                                      String region,
                                       String version,
                                       SessionType sessionType,
                                       boolean forceNew,
@@ -124,22 +135,22 @@ public abstract class WherobotsSessionSupplier {
         public URI get() throws IOException, InterruptedException {
             logger.info("Requesting {}{} runtime using {} session {}in {} from {}...",
                     forceNew ? "new " : "",
-                    runtime.name,
+                    runtime != null ? runtime : "org-default",
                     sessionType.name,
                     version != null ? String.format("running %s ", version) : "",
-                    region.name,
+                    region != null ? region : "org-default",
                     host);
 
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(
                     JsonUtil.serialize(new SqlSessionRequestPayload(
-                        runtime.name,
+                        runtime,
                         shutdownAfterInactiveSeconds,
                         version,
                         sessionType.name)));
 
             HttpRequest.Builder request = HttpRequest.newBuilder()
                     .POST(body)
-                    .uri(URI.create(String.format(SQL_SESSION_ENDPOINT, host, region.name, forceNew)))
+                    .uri(URI.create(buildSessionUri(host, region, forceNew)))
                     .header("Content-Type", "application/json");
             headers.forEach(request::header);
 

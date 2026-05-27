@@ -80,8 +80,8 @@ Configure the driver using properties passed to `DriverManager.getConnection()`:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `runtime` | `Runtime` | `TINY` | The runtime size to use (see [Runtimes](#runtimes)) |
-| `region` | `Region` | `AWS_US_WEST_2` | The cloud region to run in (see [Regions](#regions)) |
+| `runtime` | `String` | _(org default)_ | The runtime size to use. Accepts an enum name (see [Runtimes](#runtimes)) or any API value; omit to use your organization's default |
+| `region` | `String` | _(org default)_ | The cloud region to run in. Accepts an enum name (see [Regions](#regions)), an API value, or a BYOC region string (e.g. `byoc-acme-us-east-1`); omit to use your organization's default |
 | `version` | `String` | _(latest)_ | Pin to a specific WherobotsDB runtime version |
 | `sessionType` | `SessionType` | `MULTI` | `SINGLE` or `MULTI` concurrent connections |
 | `forceNew` | `boolean` | `false` | Force creation of a new session instead of reusing an existing one |
@@ -98,7 +98,9 @@ Configure the driver using properties passed to `DriverManager.getConnection()`:
 <details>
 <summary><h3>Runtimes</h3></summary>
 
-The `runtime` property accepts the following values:
+The `runtime` property accepts the enum names below (or their equivalent API
+value, e.g. `small`). Omit the property to use your organization's configured
+default runtime.
 
 | Runtime | Description |
 |---------|-------------|
@@ -124,7 +126,10 @@ The `runtime` property accepts the following values:
 <details>
 <summary><h3>Regions</h3></summary>
 
-The `region` property accepts the following values:
+The `region` property accepts the enum names below (for backward compatibility),
+the equivalent API value (e.g. `aws-us-west-2`), or any other region string such
+as a BYOC region (e.g. `byoc-acme-us-east-1`) — unknown values are passed to the
+API as-is. Omit the property to use your organization's configured default.
 
 | Region | Location |
 |--------|----------|
