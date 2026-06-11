@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -44,7 +46,7 @@ public abstract class WherobotsSessionSupplier {
     static String buildSessionUri(String host, String region, boolean forceNew) {
         StringBuilder uri = new StringBuilder(String.format(SQL_SESSION_ENDPOINT, host, forceNew));
         if (region != null && !region.isBlank()) {
-            uri.append("&region=").append(region);
+            uri.append("&region=").append(URLEncoder.encode(region, StandardCharsets.UTF_8));
         }
         return uri.toString();
     }

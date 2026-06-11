@@ -28,4 +28,14 @@ class WherobotsSessionSupplierTest {
                 "api.example.com", "byoc-acme-us-east-1", false);
         assertTrue(uri.contains("region=byoc-acme-us-east-1"));
     }
+
+    @Test
+    void buildSessionUriEncodesRegionReservedCharacters() {
+        String uri = WherobotsSessionSupplier.buildSessionUri(
+                "api.example.com", "evil&force_new=true", false);
+        // The reserved characters must be percent-encoded so they cannot
+        // inject additional query parameters or corrupt the query string.
+        assertTrue(uri.contains("region=evil%26force_new%3Dtrue"));
+        assertFalse(uri.contains("region=evil&force_new=true"));
+    }
 }
