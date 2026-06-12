@@ -42,4 +42,24 @@ public enum Runtime {
     Runtime(String name) {
         this.name = name;
     }
+
+    /**
+     * Resolves a user-supplied runtime property to the value sent to the API.
+     *
+     * <p>Accepts either an enum constant name (e.g. {@code SMALL}), for backward
+     * compatibility, which is mapped to its API value ({@code small}); or a raw
+     * string — an API value such as {@code small} — which is returned unchanged.
+     * {@code null} is returned as {@code null} so the caller can omit the
+     * runtime and let the API apply the organization's configured default.
+     */
+    public static String toApiValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Runtime.valueOf(value).name;
+        } catch (IllegalArgumentException e) {
+            return value;
+        }
+    }
 }

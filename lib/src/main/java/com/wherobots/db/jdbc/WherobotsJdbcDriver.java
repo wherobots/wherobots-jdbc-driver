@@ -30,7 +30,24 @@ public class WherobotsJdbcDriver implements Driver {
 
     public static final String API_KEY_PROP = "apiKey";
     public static final String TOKEN_PROP = "token";
+
+    /**
+     * The compute runtime to use. Accepts a {@link com.wherobots.db.Runtime}
+     * enum name or a raw string; the value is passed to the API as-is. Override
+     * the default runtime set for your organization — only set this if you need
+     * a specific runtime instead of the one your administrator has configured.
+     * When omitted, your organization's default runtime is used.
+     */
     public static final String RUNTIME_PROP = "runtime";
+
+    /**
+     * The compute region to run in. Accepts a {@link com.wherobots.db.Region}
+     * enum name or a raw string (e.g. a BYOC region such as
+     * {@code byoc-acme-us-east-1}); the value is passed to the API as-is.
+     * Override the default region set for your organization — only set this if
+     * you intend to use a specific region instead of the one your administrator
+     * has configured. When omitted, your organization's default region is used.
+     */
     public static final String REGION_PROP = "region";
     public static final String VERSION_PROP = "version";
     public static final String SESSION_TYPE_PROP = "sessionType";
@@ -50,8 +67,6 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String DEFAULT_ENDPOINT = "api.cloud.wherobots.com";
     public static final String STAGING_ENDPOINT = "api.staging.wherobots.com";
 
-    public static final Runtime DEFAULT_RUNTIME = Runtime.TINY;
-    public static final Region DEFAULT_REGION = Region.AWS_US_WEST_2;
     public static final SessionType DEFAULT_SESSION_TYPE = SessionType.MULTI;
     public static final boolean DEFAULT_FORCE_NEW = false;
 
@@ -79,17 +94,14 @@ public class WherobotsJdbcDriver implements Driver {
             throw new SQLException("Invalid URL: " + url, e);
         }
 
-        Runtime runtime = DEFAULT_RUNTIME;
-        String runtimeName = info.getProperty(RUNTIME_PROP);
-        if (StringUtils.isNotBlank(runtimeName)) {
-            runtime = Runtime.valueOf(runtimeName);
-        }
-
-        Region region = DEFAULT_REGION;
-        String regionName = info.getProperty(REGION_PROP);
-        if (StringUtils.isNotBlank(regionName)) {
-            region = Region.valueOf(regionName);
-        }
+        // Resolve region/runtime to the value sent to the API: a known enum
+        // constant name (e.g. AWS_US_WEST_2) maps to its API value for backward
+        // compatibility, while any other string (an API value or a BYOC region)
+        // is passed through untouched — so new or BYOC values work without a
+        // driver release. When omitted (null), the API applies the
+        // organization's configured default region/runtime.
+        String runtime = Runtime.toApiValue(StringUtils.trimToNull(info.getProperty(RUNTIME_PROP)));
+        String region = Region.toApiValue(StringUtils.trimToNull(info.getProperty(REGION_PROP)));
 
         String version = null;
         String givenVersion = info.getProperty(VERSION_PROP);
