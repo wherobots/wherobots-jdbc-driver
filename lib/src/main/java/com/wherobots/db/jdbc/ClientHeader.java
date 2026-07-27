@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 
 /**
@@ -79,10 +80,12 @@ public final class ClientHeader {
      * Returns a copy of {@code headers} carrying a well-formed
      * {@code X-Wherobots-Client} value.
      * <p>
-     * Any existing entry for the header — matched case-insensitively, since HTTP
-     * header names are case-insensitive — is treated as the upstream chain and
-     * collapsed into the canonical key, so the request carries exactly one such
-     * header with this driver's hop appended on the right.
+     * Any existing entries for the header — matched case-insensitively, since
+     * HTTP header names are case-insensitive — are treated as the upstream
+     * chain and collapsed into the canonical key, so the request carries
+     * exactly one such header with this driver's hop appended on the right.
+     * Several case-variant spellings are joined rather than deduplicated: none
+     * of their provenance is dropped.
      * </p>
      *
      * @param headers the outgoing headers; may be null or immutable, and is
@@ -91,17 +94,24 @@ public final class ClientHeader {
      */
     public static Map<String, String> withHop(Map<String, String> headers) {
         Map<String, String> result = new LinkedHashMap<>();
-        String upstream = null;
+        // A Map keyed by String can hold several case-variant spellings of a
+        // header name even though HTTP treats them as one. Keeping only the
+        // last match would silently drop the others' hops, so they are joined
+        // in encounter order -- collapsing to the canonical key without losing
+        // any provenance on the way.
+        StringJoiner upstream = new StringJoiner(", ");
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
                 if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(HEADER_NAME)) {
-                    upstream = entry.getValue();
+                    if (entry.getValue() != null && !entry.getValue().isBlank()) {
+                        upstream.add(entry.getValue());
+                    }
                     continue;
                 }
                 result.put(entry.getKey(), entry.getValue());
             }
         }
-        result.put(HEADER_NAME, value(upstream));
+        result.put(HEADER_NAME, value(upstream.length() == 0 ? null : upstream.toString()));
         return result;
     }
 

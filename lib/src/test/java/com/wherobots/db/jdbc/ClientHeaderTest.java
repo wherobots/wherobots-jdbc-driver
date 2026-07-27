@@ -182,6 +182,25 @@ class ClientHeaderTest {
     }
 
     @Test
+    void withHopKeepsEveryCaseVariantSpellingOfTheHeader() {
+        // A Map<String, String> permits both spellings even though HTTP does
+        // not. No caller produces this today, but collapsing to the last one
+        // seen would silently drop `client=a`.
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("x-wherobots-client", "client=a");
+        headers.put("X-Wherobots-Client", "client=b");
+
+        Map<String, String> result = ClientHeader.withHop(headers);
+
+        assertEquals(1, result.keySet().stream()
+                .filter(key -> key.equalsIgnoreCase(ClientHeader.HEADER_NAME))
+                .count());
+        assertTrue(result.get(ClientHeader.HEADER_NAME)
+                .startsWith("client=a, client=b, client=jdbc;"),
+                result.get(ClientHeader.HEADER_NAME));
+    }
+
+    @Test
     void headersAreAcceptedByTheHttpRequestBuilder() {
         // java.net.http rejects illegal header values outright, so this also
         // proves a hostile clientChain can never break session creation.
