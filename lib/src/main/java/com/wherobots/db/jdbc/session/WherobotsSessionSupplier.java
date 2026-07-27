@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.wherobots.db.AppStatus;
 import com.wherobots.db.SessionType;
+import com.wherobots.db.jdbc.ClientHeader;
 import com.wherobots.db.jdbc.serde.JsonUtil;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.core.functions.CheckedSupplier;
@@ -78,6 +79,11 @@ public abstract class WherobotsSessionSupplier {
                                           boolean forceNew, Integer shutdownAfterInactiveSeconds,
                                           Map<String, String> headers)
         throws SQLException {
+        // Append this driver's hop to the shared X-Wherobots-Client chain once,
+        // here, so every request built below — the session creation POST, the
+        // session polling GETs, and the WebSocket upgrade — carries it.
+        Map<String, String> requestHeaders = ClientHeader.withHop(headers);
+
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
@@ -91,9 +97,9 @@ public abstract class WherobotsSessionSupplier {
         Retry retry = RetryRegistry.of(config).retry("session");
 
         try {
-            URI sessionIdUri = new SqlSessionSupplier(client, headers, host, runtime, region, version, sessionType, forceNew, shutdownAfterInactiveSeconds).get();
-            URI wsUri = Retry.decorateCheckedSupplier(retry, new SessionWsUriSupplier(client, headers, sessionIdUri)).get();
-            return create(wsUri, headers);
+            URI sessionIdUri = new SqlSessionSupplier(client, requestHeaders, host, runtime, region, version, sessionType, forceNew, shutdownAfterInactiveSeconds).get();
+            URI wsUri = Retry.decorateCheckedSupplier(retry, new SessionWsUriSupplier(client, requestHeaders, sessionIdUri)).get();
+            return connect(wsUri, requestHeaders);
         } catch (SQLException e) {
             throw e;
         } catch (Throwable t) {
@@ -110,6 +116,15 @@ public abstract class WherobotsSessionSupplier {
      * @throws SQLException
      */
     public static WherobotsSession create(URI wsUri, Map<String, String> headers)
+            throws SQLException {
+        return connect(wsUri, ClientHeader.withHop(headers));
+    }
+
+    /**
+     * Opens the session WebSocket with headers that already carry this driver's
+     * attribution hop.
+     */
+    private static WherobotsSession connect(URI wsUri, Map<String, String> headers)
             throws SQLException {
         logger.info("Connecting to SQL Session at {} ...", wsUri);
         try {
