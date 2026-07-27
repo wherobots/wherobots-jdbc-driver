@@ -55,6 +55,18 @@ public class WherobotsJdbcDriver implements Driver {
     public static final String SHUTDOWN_AFTER_INACTIVE_SECONDS_PROP = "shutdownAfterInactiveSeconds";
     public static final String WS_URI_PROP = "wsUri";
 
+    /**
+     * An optional upstream {@code X-Wherobots-Client} chain to attribute this
+     * connection to. Set it only when the driver is embedded in another
+     * Wherobots client that already received or produced a chain; the driver
+     * appends its own {@code client=jdbc} hop to the right of it. The value is
+     * sanitized and dropped entirely if it would make the header exceed its
+     * size bound. This is advisory telemetry and never affects authentication.
+     *
+     * @see ClientHeader
+     */
+    public static final String CLIENT_CHAIN_PROP = "clientChain";
+
     // Results format; one of {@link DataFormat}
     public static final String FORMAT_PROP = "format";
 
@@ -80,6 +92,22 @@ public class WherobotsJdbcDriver implements Driver {
         String userAgent = String.format("wherobots-jdbc-driver/%s os/%s java/%s",
                 packageVersion, osName, javaVersion);
         return Map.of("User-Agent", userAgent);
+    }
+
+    /**
+     * Carries the caller-supplied upstream client chain, if any, into the
+     * outgoing headers. The driver's own hop is appended to it — and the value
+     * is sanitized — when the session request headers are built, so an absent
+     * or blank property simply yields no upstream chain.
+     *
+     * @see ClientHeader#withHop(Map)
+     */
+    Map<String, String> getClientChainHeader(Properties info) {
+        String chain = info.getProperty(CLIENT_CHAIN_PROP);
+        if (StringUtils.isBlank(chain)) {
+            return Collections.emptyMap();
+        }
+        return Map.of(ClientHeader.HEADER_NAME, chain);
     }
 
     @Override
@@ -129,6 +157,7 @@ public class WherobotsJdbcDriver implements Driver {
 
         Map<String, String> headers = new HashMap<>(getAuthHeaders(info));
         headers.putAll(getUserAgentHeader());
+        headers.putAll(getClientChainHeader(info));
         WherobotsSession session;
 
         String wsUriString = info.getProperty(WS_URI_PROP);
