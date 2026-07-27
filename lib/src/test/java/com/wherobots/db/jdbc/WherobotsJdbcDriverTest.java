@@ -1,6 +1,7 @@
 package com.wherobots.db.jdbc;
 
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -11,6 +12,25 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WherobotsJdbcDriverTest {
+
+    // These tests overwrite JVM-wide system properties, so they restore them
+    // afterwards rather than leaving them set for whatever runs next. Nothing
+    // depends on that today only because every test that reads them sets them
+    // first; test ordering or parallel execution would end that.
+    private final Map<String, String> originalProperties = Map.of(
+            "os.name", System.getProperty("os.name", ""),
+            "java.version", System.getProperty("java.version", ""));
+
+    @AfterEach
+    void restoreSystemProperties() {
+        originalProperties.forEach((key, value) -> {
+            if (value.isEmpty()) {
+                System.clearProperty(key);
+            } else {
+                System.setProperty(key, value);
+            }
+        });
+    }
 
     @Test
     void getUserAgentHeader() {

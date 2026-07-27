@@ -69,6 +69,18 @@ class ClientHeaderTest {
     }
 
     @Test
+    void hopTruncationDoesNotExposeATrailingSeparator() {
+        // The 63-character cut lands right after the `,` that sanitizing
+        // turned into a `-`, so stripping separators before truncating is not
+        // enough -- the truncation itself can create a new trailing one.
+        String version = "v".repeat(62) + ",rc1";
+
+        String hop = ClientHeader.hop(version, "linux");
+
+        assertEquals("client=jdbc;ver=" + "v".repeat(62) + ";plat=linux", hop);
+    }
+
+    @Test
     void valueWithoutUpstreamChainIsASingleHop() {
         System.setProperty("os.name", "Linux");
         String value = ClientHeader.value(null);

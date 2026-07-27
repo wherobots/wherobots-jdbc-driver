@@ -186,10 +186,14 @@ public final class ClientHeader {
         }
         String sanitized = UNSAFE_PARAM_CHARS.matcher(value.trim()).replaceAll("-");
         // Leading/trailing separators carry no information and read as noise.
-        sanitized = sanitized.replaceAll("^-+", "").replaceAll("-+$", "");
-        return sanitized.length() > MAX_PARAM_LENGTH
-                ? sanitized.substring(0, MAX_PARAM_LENGTH)
-                : sanitized;
+        sanitized = sanitized.replaceAll("^-+", "");
+        if (sanitized.length() > MAX_PARAM_LENGTH) {
+            sanitized = sanitized.substring(0, MAX_PARAM_LENGTH);
+        }
+        // Stripped after truncation as well as before it: the cut can land
+        // immediately after a replaced character and expose a trailing `-`
+        // that was in the middle of the value a moment ago.
+        return sanitized.replaceAll("-+$", "");
     }
 
     private static int utf8Length(String value) {

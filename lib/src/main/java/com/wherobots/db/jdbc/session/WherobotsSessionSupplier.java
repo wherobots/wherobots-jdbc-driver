@@ -83,6 +83,11 @@ public abstract class WherobotsSessionSupplier {
         // here, so every request built below — the session creation POST, the
         // session polling GETs, and the WebSocket upgrade — carries it.
         Map<String, String> requestHeaders = ClientHeader.withHop(headers);
+        // Without this, the only way to see what attribution actually went out
+        // is a packet capture. The chain is advisory, client-asserted metadata
+        // — no credentials pass through it — so it is safe to log.
+        logger.debug("{}: {}", ClientHeader.HEADER_NAME,
+                requestHeaders.get(ClientHeader.HEADER_NAME));
 
         HttpClient client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
