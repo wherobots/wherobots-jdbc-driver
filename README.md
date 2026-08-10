@@ -86,6 +86,7 @@ Configure the driver using properties passed to `DriverManager.getConnection()`:
 | `sessionType` | `SessionType` | `MULTI` | `SINGLE` or `MULTI` concurrent connections |
 | `forceNew` | `boolean` | `false` | Force creation of a new session instead of reusing an existing one |
 | `wsUri` | `String` | _(none)_ | Connect directly to a WebSocket URI (advanced) |
+| `clientChain` | `String` | _(none)_ | Upstream client chain to attribute the connection to (see [Client attribution](#client-attribution)) |
 
 ### Result Options
 
@@ -140,6 +141,34 @@ API as-is. Omit the property to use your organization's configured default.
 | `AWS_AP_SOUTH_1` | Asia Pacific (Mumbai) |
 
 </details>
+
+## Client attribution
+
+Every request the driver makes — session creation, session polling, and the
+session WebSocket upgrade — carries an `X-Wherobots-Client` header identifying
+the driver:
+
+```
+X-Wherobots-Client: client=jdbc;ver=0.4.0;plat=mac-os-x
+```
+
+The header is an ordered, comma-separated list of hops; the leftmost hop is the
+origin client and each component appends its own hop on the right. It is
+advisory telemetry used for attribution and analytics, and never affects
+authentication or authorization.
+
+If you are embedding the driver in another Wherobots client and already have a
+chain to attribute the connection to, pass it as `clientChain` and the driver
+appends its own hop to the right of it:
+
+```java
+props.put("clientChain", "client=claude_web, client=mcp;ver=0.9");
+// X-Wherobots-Client: client=claude_web, client=mcp;ver=0.9, client=jdbc;ver=0.4.0;plat=mac-os-x
+```
+
+The value is sanitized — characters that would corrupt the header grammar are
+replaced — and dropped entirely if it would push the header past its 512-byte
+bound, so a bad `clientChain` can never break a connection.
 
 ## Using with DataGrip
 
