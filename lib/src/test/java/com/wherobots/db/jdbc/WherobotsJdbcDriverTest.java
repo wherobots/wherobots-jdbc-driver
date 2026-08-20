@@ -66,14 +66,14 @@ class WherobotsJdbcDriverTest {
     void clientChainPropertyEndsUpLeftOfTheDriverHop() {
         System.setProperty("os.name", "Linux");
         Properties info = new Properties();
-        info.put(WherobotsJdbcDriver.CLIENT_CHAIN_PROP, "client=claude_web, client=mcp;ver=0.9");
+        info.put(WherobotsJdbcDriver.CLIENT_CHAIN_PROP, "client=claude-web, client=mcp;ver=0.9");
 
         // The value the session request will actually carry: the driver stages
         // the caller's chain, the session supplier appends the driver's hop.
         Map<String, String> headers = ClientHeader.withHop(
                 new WherobotsJdbcDriver().getClientChainHeader(info));
 
-        assertEquals("client=claude_web, client=mcp;ver=0.9, client=jdbc;ver="
+        assertEquals("client=claude-web, client=mcp;ver=0.9, client=jdbc;ver="
                         + ClientHeader.UNKNOWN_VERSION + ";plat=linux",
                 headers.get(ClientHeader.HEADER_NAME));
     }
