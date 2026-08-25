@@ -162,8 +162,8 @@ chain to attribute the connection to, pass it as `clientChain` and the driver
 appends its own hop to the right of it:
 
 ```java
-props.put("clientChain", "client=claude_web, client=mcp;ver=0.9");
-// X-Wherobots-Client: client=claude_web, client=mcp;ver=0.9, client=jdbc;ver=0.4.0;plat=mac-os-x
+props.put("clientChain", "client=claude-web, client=mcp;ver=0.9");
+// X-Wherobots-Client: client=claude-web, client=mcp;ver=0.9, client=jdbc;ver=0.4.0;plat=mac-os-x
 ```
 
 The value is sanitized — characters that would corrupt the header grammar are

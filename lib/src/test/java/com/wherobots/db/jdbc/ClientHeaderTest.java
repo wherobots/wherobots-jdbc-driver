@@ -104,11 +104,11 @@ class ClientHeaderTest {
     @Test
     void valueAppendsOwnHopToTheRightOfAnUpstreamChain() {
         System.setProperty("os.name", "Linux");
-        String value = ClientHeader.value("client=claude_web, client=mcp;ver=0.9");
-        assertEquals("client=claude_web, client=mcp;ver=0.9, "
+        String value = ClientHeader.value("client=claude-web, client=mcp;ver=0.9");
+        assertEquals("client=claude-web, client=mcp;ver=0.9, "
                 + ClientHeader.hop(ClientHeader.driverVersion(), "Linux"), value);
         // Leftmost hop stays the origin; ours is the rightmost, direct caller.
-        assertTrue(value.startsWith("client=claude_web,"), value);
+        assertTrue(value.startsWith("client=claude-web,"), value);
         assertTrue(value.endsWith("plat=linux"), value);
     }
 
