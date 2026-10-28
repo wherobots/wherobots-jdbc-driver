@@ -29,25 +29,17 @@ The smoke test connects to a real Wherobots session:
 
 ## Releasing
 
-### Prerequisites
+Releases run in CI through `.github/workflows/release.yml`.
 
-1. An account on [Sonatype's Central
-   Portal](https://central.sonatype.com) with permissions to publish to the
-   `com.wherobots` namespace
-2. A GnuPG key for signing artifacts, loaded in `gpg-agent`
-
-### Publishing a Release
-
-1. Update the version in `lib/build.gradle`
-2. Set up your credentials:
-   ```sh
-   export OSSRH_USERNAME=<user token>
-   export OSSRH_PASSWORD=<secret key>
-   ```
-3. Publish to Maven Central:
-   ```sh
-   ./gradlew clean publishToCentralPortal
-   ```
-4. Monitor the deployment at
+1. In a PR, bump `version = 'x.y.z'` in `lib/build.gradle`. Keep that
+   single-quoted form, since the workflow reads it with `grep` and `sed`.
+2. Merge it. The workflow runs on any push to `main` that changes
+   `lib/build.gradle`. If tag `v<version>` does not exist yet, it signs the
+   artifacts, runs `./gradlew clean build shadowJar publishToCentralPortal`,
+   and creates GitHub release `v<version>` (which creates the tag) with the
+   shaded `*-all.jar` attached.
+3. Check the deployment at
    https://central.sonatype.com/publishing/deployments
-5. Create a git tag and GitHub release for the new version
+
+Don't publish from your machine or push the tag by hand. If tag
+`v<version>` already exists, the workflow skips the release.
