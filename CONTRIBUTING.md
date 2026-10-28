@@ -31,7 +31,8 @@ The smoke test connects to a real Wherobots session:
 
 Releases run in CI through `.github/workflows/release.yml`.
 
-1. In a PR, bump `version` in `lib/build.gradle`.
+1. In a PR, bump `version = 'x.y.z'` in `lib/build.gradle`. Keep that
+   single-quoted form, since the workflow reads it with `grep` and `sed`.
 2. Merge it. The workflow runs on any push to `main` that changes
    `lib/build.gradle`. If tag `v<version>` does not exist yet, it signs the
    artifacts, runs `./gradlew clean build shadowJar publishToCentralPortal`,
