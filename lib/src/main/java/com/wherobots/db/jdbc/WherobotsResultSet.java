@@ -189,10 +189,13 @@ public class WherobotsResultSet implements ResultSet {
             case Struct:
                 LinkedHashMap<String, Object> refinedStructMap = new LinkedHashMap<>();
                 Map<?, ?> storageStructMap = (Map<?, ?>) storage;
-                int index = 0;
-                for (Map.Entry<?, ?> entry : storageStructMap.entrySet()) {
-                    Field structField = arrowField.getChildren().get(index++);
-                    refinedStructMap.put(entry.getKey().toString(), refineStorage(entry.getValue(), structField));
+                // Arrow omits null children from the storage map. Match by name so
+                // a missing child cannot shift the types used for later values.
+                for (Field structField : arrowField.getChildren()) {
+                    String name = structField.getName();
+                    if (storageStructMap.containsKey(name)) {
+                        refinedStructMap.put(name, refineStorage(storageStructMap.get(name), structField));
+                    }
                 }
                 return refinedStructMap;
 
